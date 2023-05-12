@@ -156,10 +156,7 @@ def default_init_params(output_min, output_max):
     output_min: None or minimum layer output.
     output_max: None or maximum layer output.
   """
-  if output_min is None and output_max is None:
-    return 0.5, 1.5
-  else:
-    return 0.0, 1.0
+  return (0.5, 1.5) if output_min is None and output_max is None else (0.0, 1.0)
 
 
 def kfl_random_monotonic_initializer(shape,
@@ -201,9 +198,8 @@ def kfl_random_monotonic_initializer(shape,
     _, lattice_sizes, units_times_dims, num_terms = shape
     if units_times_dims % dims != 0:
       raise ValueError(
-          "len(monotonicities) is {}, which does not evenly divide shape[2]."
-          "len(monotonicities) should be equal to `dims`, and shape[2] "
-          "should be equal to units * dims.".format(dims))
+          f"len(monotonicities) is {dims}, which does not evenly divide shape[2].len(monotonicities) should be equal to `dims`, and shape[2] should be equal to units * dims."
+      )
     units = units_times_dims // dims
     weights = tf.reshape(weights, [-1, lattice_sizes, units, dims, num_terms])
     # Make all dimensions monotonically increasing with respect to the sign of
@@ -503,15 +499,13 @@ def verify_hyperparameters(lattice_sizes=None,
     ValueError: If len(monotonicities) does not match number of inputs.
   """
   if lattice_sizes and lattice_sizes < 2:
-    raise ValueError("Lattice size must be at least 2. Given: %s" %
-                     lattice_sizes)
+    raise ValueError(f"Lattice size must be at least 2. Given: {lattice_sizes}")
 
   if units and units < 1:
-    raise ValueError("Units must be at least 1. Given: %s" % units)
+    raise ValueError(f"Units must be at least 1. Given: {units}")
 
   if num_terms and num_terms < 1:
-    raise ValueError("Number of terms must be at least 1. Given: %s" %
-                     num_terms)
+    raise ValueError(f"Number of terms must be at least 1. Given: {num_terms}")
 
   # input_shape: (batch, ..., units, dims)
   if input_shape:
@@ -542,11 +536,11 @@ def verify_hyperparameters(lattice_sizes=None,
                        "'units'. 'units': %s, 'input_shape: %s" %
                        (units, input_shape))
 
-  if output_min is not None and output_max is not None:
-    if output_min >= output_max:
-      raise ValueError("'output_min' must be strictly less than 'output_max'. "
-                       "'output_min': %f, 'output_max': %f" %
-                       (output_min, output_max))
+  if (output_min is not None and output_max is not None
+      and output_min >= output_max):
+    raise ValueError("'output_min' must be strictly less than 'output_max'. "
+                     "'output_min': %f, 'output_max': %f" %
+                     (output_min, output_max))
 
 
 def _assert_monotonicity_constraints(weights, units, scale, monotonicities,

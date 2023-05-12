@@ -125,18 +125,18 @@ class CategoricalCalibrationLayerTest(parameterized.TestCase, tf.test.TestCase):
 
     model = keras.models.Sequential()
     model.add(keras.layers.Input(shape=[input_units], dtype=tf.int32))
-    calibration_layers = []
-    for _ in range(num_calibration_layers):
-      calibration_layers.append(
-          categorical_calibraion.CategoricalCalibration(
-              units=categorical_calibraion_units,
-              kernel_initializer="constant",
-              num_buckets=config["num_buckets"],
-              output_min=config["output_min"],
-              output_max=config["output_max"],
-              monotonicities=config["monotonicities"],
-              kernel_regularizer=config["kernel_regularizer"],
-              default_input_value=config["default_input_value"]))
+    calibration_layers = [
+        categorical_calibraion.CategoricalCalibration(
+            units=categorical_calibraion_units,
+            kernel_initializer="constant",
+            num_buckets=config["num_buckets"],
+            output_min=config["output_min"],
+            output_max=config["output_max"],
+            monotonicities=config["monotonicities"],
+            kernel_regularizer=config["kernel_regularizer"],
+            default_input_value=config["default_input_value"],
+        ) for _ in range(num_calibration_layers)
+    ]
     if len(calibration_layers) == 1:
       model.add(calibration_layers[0])
     else:

@@ -1162,10 +1162,8 @@ def _apply_update(node, k, v):
       current_value = getattr(node, k)
       if current_value is None:
         raise ValueError(
-            'Field `{}` has None value and can not be overridden by the '
-            'hparams string value `{}` since the type cannot be inferred. An '
-            'initial value must be set for the field to use string hparams.'
-            .format(k, v))
+            f'Field `{k}` has None value and can not be overridden by the hparams string value `{v}` since the type cannot be inferred. An initial value must be set for the field to use string hparams.'
+        )
       v = type(current_value)(v)
 
     setattr(node, k, v)

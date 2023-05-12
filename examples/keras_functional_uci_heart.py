@@ -86,36 +86,6 @@ def main(_):
   training_data_df = pd.read_csv(csv_file).sample(
       frac=1.0, random_state=41).reset_index(drop=True)
 
-  # Feature columns.
-  # 0  age
-  # 1  sex
-  # 2  cp        chest pain type (4 values)
-  # 3  trestbps  resting blood pressure
-  # 4  chol      serum cholestoral in mg/dl
-  # 5  fbs       fasting blood sugar > 120 mg/dl
-  # 6  restecg   resting electrocardiographic results (values 0,1,2)
-  # 7  thalach   maximum heart rate achieved
-  # 8  exang     exercise induced angina
-  # 9  oldpeak   ST depression induced by exercise relative to rest
-  # 10 slope     the slope of the peak exercise ST segment
-  # 11 ca        number of major vessels (0-3) colored by flourosopy
-  # 12 thal      3 = normal; 6 = fixed defect; 7 = reversable defect
-
-  # Example slice of training data:
-  #     age  sex  cp  trestbps  chol  fbs  restecg  thalach  exang  oldpeak
-  # 0   63    1   1       145   233    1        2      150      0      2.3
-  # 1   67    1   4       160   286    0        2      108      1      1.5
-  # 2   67    1   4       120   229    0        2      129      1      2.6
-  # 3   37    1   3       130   250    0        0      187      0      3.5
-  # 4   41    0   2       130   204    0        2      172      0      1.4
-  # 5   56    1   2       120   236    0        0      178      0      0.8
-  # 6   62    0   4       140   268    0        2      160      0      3.6
-  # 7   57    0   4       120   354    0        0      163      1      0.6
-  # 8   63    1   4       130   254    0        2      147      0      1.4
-  # 9   53    1   4       140   203    1        2      155      1      3.1
-
-  model_inputs = []
-  lattice_inputs = []
   # We are going to have 2-d embedding as one of lattice inputs.
   lattice_sizes_for_embedding = [2, 3]
   lattice_sizes = lattice_sizes_for_embedding + [2, 2, 3, 3, 2, 2]
@@ -123,7 +93,7 @@ def main(_):
   # ############### age ###############
 
   age_input = keras.layers.Input(shape=[1])
-  model_inputs.append(age_input)
+  model_inputs = [age_input]
   age_embedding = keras.layers.Embedding(
       input_dim=10,
       output_dim=len(lattice_sizes_for_embedding),
@@ -142,8 +112,7 @@ def main(_):
       shape=(1, 2))
   age_ranged = keras.layers.multiply(
       [keras.activations.sigmoid(age_embedding), embedding_lattice_input_range])
-  lattice_inputs.append(age_ranged)
-
+  lattice_inputs = [age_ranged]
   # ############### sex ###############
 
   # For boolean features simply specify CategoricalCalibration layer with 2

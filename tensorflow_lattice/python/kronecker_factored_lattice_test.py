@@ -713,16 +713,18 @@ class KroneckerFactoredLatticeTest(parameterized.TestCase, tf.test.TestCase):
       (4, 4, 2, 4, -1.5, 2.3),
       (2, 2, 2, 2, None, None),
   )
-  # Note: dims must be at least 1
   def testConstraints(self, lattice_sizes, units, dims, num_terms, output_min,
                       output_max):
     if self.disable_all:
       return
+    # Create 100 random inputs that are frozen in all but the increasing
+    # dimension, which increases uniformly from 0 to lattice_sizes-1.
+    batch_size = 100
+    # Offset the initiailization bounds to increase likelihood of breaking
+    # constraints.
+    offset = 100
     # Run our test for 100 iterations to minimize the chance we pass by chance.
     for _ in range(100):
-      # Create 100 random inputs that are frozen in all but the increasing
-      # dimension, which increases uniformly from 0 to lattice_sizes-1.
-      batch_size = 100
       random_vals = [
           np.random.uniform(0, lattice_sizes - 1) for _ in range(dims - 1)
       ]
@@ -744,9 +746,6 @@ class KroneckerFactoredLatticeTest(parameterized.TestCase, tf.test.TestCase):
       init_min = -1.5 if output_min is None else output_min
       init_max = 1.5 if output_max is None else output_max
 
-      # Offset the initiailization bounds to increase likelihood of breaking
-      # constraints.
-      offset = 100
       kernel = tf.random.uniform([1, lattice_sizes, units * dims, num_terms],
                                  minval=init_min - offset,
                                  maxval=init_max + offset)
@@ -949,10 +948,9 @@ class KroneckerFactoredLatticeTest(parameterized.TestCase, tf.test.TestCase):
     # Input (batch_size, dims) or (batch_size, units, dims)
     if units == 1:
       example = [float(i) for i in range(dims)]
-      examples = [example for _ in range(batch_size)]
     else:
       example = [[float(i) for i in range(dims)] for _ in range(units)]
-      examples = [example for _ in range(batch_size)]
+    examples = [example for _ in range(batch_size)]
     inputs = tf.constant(examples)
     outputs = kfl_layer(inputs)
     self.assertEqual(outputs.shape, expected_output_shape)

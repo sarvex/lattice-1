@@ -280,11 +280,7 @@ class KroneckerFactoredLattice(keras.layers.Layer):
     """Standard Keras compute_output_shape() method."""
     if isinstance(input_shape, list):
       input_shape = input_shape[0]
-    if self.units == 1:
-      return tuple(input_shape[:-1]) + (1,)
-    else:
-      # Second to last dimension must be equal to 'units'. Nothing to append.
-      return input_shape[:-1]
+    return tuple(input_shape[:-1]) + (1,) if self.units == 1 else input_shape[:-1]
 
   def get_config(self):
     """Standard Keras config for serialization."""
@@ -301,7 +297,7 @@ class KroneckerFactoredLattice(keras.layers.Layer):
         "scale_initializer":
             keras.initializers.serialize(self.scale_initializer),
     }  # pyformat: disable
-    config.update(super(KroneckerFactoredLattice, self).get_config())
+    config |= super(KroneckerFactoredLattice, self).get_config()
     return config
 
   # TODO: can we remove this now that we always project at every step?
@@ -379,25 +375,20 @@ def create_kernel_initializer(kernel_initializer_id,
   """
   if init_min is None and init_max is None:
     init_min, init_max = kfl_lib.default_init_params(output_min, output_max)
-  elif init_min is not None and init_max is not None:
-    # We have nothing to set here.
-    pass
-  else:
+  elif init_min is None or init_max is None:
     raise ValueError("Both or neither of init_{min/max} must be set")
 
-  # Construct initializer.
   if kernel_initializer_id in [
       "kfl_random_monotonic_initializer", "KFLRandomMonotonicInitializer"
   ]:
     return KFLRandomMonotonicInitializer(
         monotonicities=monotonicities, init_min=init_min, init_max=init_max)
-  else:
-    # This is needed for Keras deserialization logic to be aware of our custom
-    # objects.
-    with keras.utils.custom_object_scope({
-        "KFLRandomMonotonicInitializer": KFLRandomMonotonicInitializer,
-    }):
-      return keras.initializers.get(kernel_initializer_id)
+  # This is needed for Keras deserialization logic to be aware of our custom
+  # objects.
+  with keras.utils.custom_object_scope({
+      "KFLRandomMonotonicInitializer": KFLRandomMonotonicInitializer,
+  }):
+    return keras.initializers.get(kernel_initializer_id)
 
 
 def create_scale_initializer(scale_initializer_id, output_min, output_max):
@@ -419,16 +410,14 @@ def create_scale_initializer(scale_initializer_id, output_min, output_max):
     The Keras initializer object for the `tfl.layers.KroneckerFactoredLattice`
     scale variable.
   """
-  # Construct initializer.
   if scale_initializer_id in ["scale_initializer", "ScaleInitializer"]:
     return ScaleInitializer(output_min=output_min, output_max=output_max)
-  else:
-    # This is needed for Keras deserialization logic to be aware of our custom
-    # objects.
-    with keras.utils.custom_object_scope({
-        "ScaleInitializer": ScaleInitializer,
-    }):
-      return keras.initializers.get(scale_initializer_id)
+  # This is needed for Keras deserialization logic to be aware of our custom
+  # objects.
+  with keras.utils.custom_object_scope({
+      "ScaleInitializer": ScaleInitializer,
+  }):
+    return keras.initializers.get(scale_initializer_id)
 
 
 class KFLRandomMonotonicInitializer(keras.initializers.Initializer):
@@ -473,13 +462,12 @@ class KFLRandomMonotonicInitializer(keras.initializers.Initializer):
 
   def get_config(self):
     """Standard Keras config for serializaion."""
-    config = {
+    return {
         "monotonicities": self.monotonicities,
         "init_min": self.init_min,
         "init_max": self.init_max,
         "seed": self.seed,
-    }  # pyformat: disable
-    return config
+    }
 
 
 class ScaleInitializer(keras.initializers.Initializer):
@@ -522,11 +510,10 @@ class ScaleInitializer(keras.initializers.Initializer):
 
   def get_config(self):
     """Standard Keras config for serializaion."""
-    config = {
+    return {
         "output_min": self.output_min,
         "output_max": self.output_max,
-    }  # pyformat: disable
-    return config
+    }
 
 
 class BiasInitializer(keras.initializers.Initializer):
@@ -567,11 +554,10 @@ class BiasInitializer(keras.initializers.Initializer):
 
   def get_config(self):
     """Standard Keras config for serializaion."""
-    config = {
+    return {
         "output_min": self.output_min,
         "output_max": self.output_max,
-    }  # pyformat: disable
-    return config
+    }
 
 
 class KroneckerFactoredLatticeConstraints(keras.constraints.Constraint):

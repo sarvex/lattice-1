@@ -141,11 +141,11 @@ def verify_hyperparameters(num_buckets=None,
   Raises:
     ValueError: If parameters are incorrect or inconsistent.
   """
-  if output_min is not None and output_max is not None:
-    if output_max < output_min:
-      raise ValueError(
-          "If specified output_max must be greater than output_min. "
-          "They are: ({}, {})".format(output_min, output_max))
+  if (output_min is not None and output_max is not None
+      and output_max < output_min):
+    raise ValueError(
+        f"If specified output_max must be greater than output_min. They are: ({output_min}, {output_max})"
+    )
 
   if monotonicities:
     if (not isinstance(monotonicities, list) or not all(
@@ -156,5 +156,5 @@ def verify_hyperparameters(num_buckets=None,
       if (i < 0 or j < 0 or (num_buckets is not None and
                              (i >= num_buckets or j >= num_buckets))):
         raise ValueError(
-            "Monotonicities should be pairs of be indices in range "
-            "[0, num_buckets). They are: {}".format(monotonicities))
+            f"Monotonicities should be pairs of be indices in range [0, num_buckets). They are: {monotonicities}"
+        )

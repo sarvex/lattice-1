@@ -34,9 +34,7 @@ class UtilsTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters((-2), (0.5), (3), ("invalid_convexity"),
                             ("concaves"), ("nonw"), ("conve"))
   def testInvalidConvexity(self, invalid_convexity):
-    error_message = (
-        "'convexity' must be from: [-1, 0, 1, 'concave', 'none', 'convex']. "
-        "Given: {}").format(invalid_convexity)
+    error_message = f"'convexity' must be from: [-1, 0, 1, 'concave', 'none', 'convex']. Given: {invalid_convexity}"
     with self.assertRaisesWithLiteralMatch(ValueError, error_message):
       utils.canonicalize_convexity(invalid_convexity)
 
@@ -62,9 +60,7 @@ class UtilsTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters({"invalid_input_bounds": [0, 1.0, 2.0]},
                             {"invalid_input_bounds": [None, "nonw"]})
   def testInvalidInputBounds(self, invalid_input_bounds):
-    error_message = (
-        "Both 'input_min' and 'input_max' elements must be either int, float, "
-        "None, or 'none'. Given: {}").format(invalid_input_bounds)
+    error_message = f"Both 'input_min' and 'input_max' elements must be either int, float, None, or 'none'. Given: {invalid_input_bounds}"
     with self.assertRaisesWithLiteralMatch(ValueError, error_message):
       utils.canonicalize_input_bounds(invalid_input_bounds)
 
@@ -79,17 +75,13 @@ class UtilsTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters((-2), (0.5), (3), ("invalid_monotonicity"),
                             ("decrease"), ("increase"))
   def testInvalidMonotonicity(self, invalid_monotonicity):
-    error_message = (
-        "'monotonicities' must be from: [-1, 0, 1, 'decreasing', 'none', "
-        "'increasing']. Given: {}").format(invalid_monotonicity)
+    error_message = f"'monotonicities' must be from: [-1, 0, 1, 'decreasing', 'none', 'increasing']. Given: {invalid_monotonicity}"
     with self.assertRaisesWithLiteralMatch(ValueError, error_message):
       utils.canonicalize_monotonicity(invalid_monotonicity)
 
   @parameterized.parameters(("decreasing"), (-1))
   def testInvalidDecreasingMonotonicity(self, invalid_monotonicity):
-    error_message = (
-        "'monotonicities' must be from: [0, 1, 'none', 'increasing']. "
-        "Given: {}").format(invalid_monotonicity)
+    error_message = f"'monotonicities' must be from: [0, 1, 'none', 'increasing']. Given: {invalid_monotonicity}"
     with self.assertRaisesWithLiteralMatch(ValueError, error_message):
       utils.canonicalize_monotonicity(
           invalid_monotonicity, allow_decreasing=False)
@@ -123,9 +115,7 @@ class UtilsTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters({"invalid_trusts": [("a", "b", 0)]},
                             {"invalid_trusts": [("a", "b", "negativ")]})
   def testInvalidTrustDirection(self, invalid_trusts):
-    error_message = (
-        "trust constraint direction must be from: [-1, 1, 'negative', "
-        "'positive']. Given: {}").format(invalid_trusts[0][2])
+    error_message = f"trust constraint direction must be from: [-1, 1, 'negative', 'positive']. Given: {invalid_trusts[0][2]}"
     with self.assertRaisesWithLiteralMatch(ValueError, error_message):
       utils.canonicalize_trust(invalid_trusts)
 
@@ -136,9 +126,7 @@ class UtilsTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters({"invalid_trusts": [("a", 1)]},
                             {"invalid_trusts": [("a", "b", -1, 1)]})
   def testInvalidTrustLength(self, invalid_trusts):
-    error_message = (
-        "Trust constraints must consist of 3 elements. Seeing constraint "
-        "tuple {}").format(invalid_trusts[0])
+    error_message = f"Trust constraints must consist of 3 elements. Seeing constraint tuple {invalid_trusts[0]}"
     with self.assertRaisesWithLiteralMatch(ValueError, error_message):
       utils.canonicalize_trust(invalid_trusts)
 
@@ -166,9 +154,7 @@ class UtilsTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters({"invalid_unimodalities": ["vally", 0]},
                             {"invalid_unimodalities": [-1, 0, 2]})
   def testInvalidUnimoadlities(self, invalid_unimodalities):
-    error_message = (
-        "'unimodalities' elements must be from: [-1, 0, 1, 'peak', 'none', "
-        "'valley']. Given: {}").format(invalid_unimodalities)
+    error_message = f"'unimodalities' elements must be from: [-1, 0, 1, 'peak', 'none', 'valley']. Given: {invalid_unimodalities}"
     with self.assertRaisesWithLiteralMatch(ValueError, error_message):
       utils.canonicalize_unimodalities(invalid_unimodalities)
 

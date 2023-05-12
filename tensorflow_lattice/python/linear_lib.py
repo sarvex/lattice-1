@@ -258,12 +258,12 @@ def verify_hyperparameters(num_input_dims=None,
   input_min = utils.canonicalize_input_bounds(input_min)
   input_max = utils.canonicalize_input_bounds(input_max)
 
-  if monotonicities is not None and num_input_dims is not None:
-    if len(monotonicities) != num_input_dims:
-      raise ValueError("Number of elements in 'monotonicities' must be equal to"
-                       " num_input_dims. monotoniticites: %s, "
-                       "len(monotonicities): %d, num_input_dims: %d" %
-                       (monotonicities, len(monotonicities), num_input_dims))
+  if (monotonicities is not None and num_input_dims is not None
+      and len(monotonicities) != num_input_dims):
+    raise ValueError("Number of elements in 'monotonicities' must be equal to"
+                     " num_input_dims. monotoniticites: %s, "
+                     "len(monotonicities): %d, num_input_dims: %d" %
+                     (monotonicities, len(monotonicities), num_input_dims))
 
   if weights_shape is not None:
     if len(weights_shape) != 2:
@@ -309,23 +309,23 @@ def verify_hyperparameters(num_input_dims=None,
 
   if monotonic_dominances is not None:
     assert monotonicities is not None
-    num_input_dims = len(monotonicities)
     dim_pairs = set()
+    num_input_dims = len(monotonicities)
     for constraint in monotonic_dominances:
       if len(constraint) != 2:
-        raise ValueError("Monotonic dominance constraints must consist of 2 "
-                         "elements. Seeing constraint tuple %s" % (constraint,))
+        raise ValueError(
+            f"Monotonic dominance constraints must consist of 2 elements. Seeing constraint tuple {constraint}"
+        )
       dominant_dim, weak_dim = constraint
       if (dominant_dim >= num_input_dims or weak_dim >= num_input_dims or
           dominant_dim < 0 or weak_dim < 0):
-        raise ValueError("Dimensions constrained by monotonic dominance "
-                         "constraints are not within the input dimensions. "
-                         "'dims': %s, %s, num_dims: %s" %
-                         (dominant_dim, weak_dim, num_input_dims))
+        raise ValueError(
+            f"Dimensions constrained by monotonic dominance constraints are not within the input dimensions. 'dims': {dominant_dim}, {weak_dim}, num_dims: {num_input_dims}"
+        )
       if not isinstance(dominant_dim, int) or not isinstance(weak_dim, int):
-        raise ValueError("Monotonic dominance constraint dimensions must be "
-                         "integers. Seeing dominant_dim %s and weak_dim %s" %
-                         (dominant_dim, weak_dim))
+        raise ValueError(
+            f"Monotonic dominance constraint dimensions must be integers. Seeing dominant_dim {dominant_dim} and weak_dim {weak_dim}"
+        )
       for dim in [dominant_dim, weak_dim]:
         if monotonicities[dim] != 1:
           raise ValueError("Monotonic dominance constraint's dimensions must "
@@ -339,23 +339,23 @@ def verify_hyperparameters(num_input_dims=None,
 
   if range_dominances is not None:
     assert monotonicities is not None
-    num_input_dims = len(monotonicities)
     dim_pairs = set()
+    num_input_dims = len(monotonicities)
     for constraint in range_dominances:
       if len(constraint) != 2:
-        raise ValueError("Range dominance constraints must consist of 2 "
-                         "elements. Seeing constraint tuple %s" % (constraint,))
+        raise ValueError(
+            f"Range dominance constraints must consist of 2 elements. Seeing constraint tuple {constraint}"
+        )
       dominant_dim, weak_dim = constraint
       if (dominant_dim >= num_input_dims or weak_dim >= num_input_dims or
           dominant_dim < 0 or weak_dim < 0):
-        raise ValueError("Dimensions constrained by range dominance "
-                         "constraints are not within the input dimensions. "
-                         "'dims': %s, %s, num_dims: %s" %
-                         (dominant_dim, weak_dim, num_input_dims))
+        raise ValueError(
+            f"Dimensions constrained by range dominance constraints are not within the input dimensions. 'dims': {dominant_dim}, {weak_dim}, num_dims: {num_input_dims}"
+        )
       if not isinstance(dominant_dim, int) or not isinstance(weak_dim, int):
-        raise ValueError("Range dominance constraint dimensions must be "
-                         "integers. Seeing dominant_dim %s and weak_dim %s" %
-                         (dominant_dim, weak_dim))
+        raise ValueError(
+            f"Range dominance constraint dimensions must be integers. Seeing dominant_dim {dominant_dim} and weak_dim {weak_dim}"
+        )
       if (monotonicities[dominant_dim] != monotonicities[weak_dim] or
           monotonicities[dominant_dim] == 0):
         raise ValueError("Range dominance constraint's dimensions must have "

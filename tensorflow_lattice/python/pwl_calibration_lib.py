@@ -85,12 +85,9 @@ def _convert_constraints(value, clamp_to_value):
   """
   if value is None:
     return 0.0, BoundConstraintsType.NONE
-  else:
-    value = float(value)
-    if clamp_to_value:
-      return value, BoundConstraintsType.CLAMPED
-    else:
-      return value, BoundConstraintsType.BOUND
+  value = float(value)
+  return ((value, BoundConstraintsType.CLAMPED) if clamp_to_value else
+          (value, BoundConstraintsType.BOUND))
 
 
 def compute_interpolation_weights(inputs, keypoints, lengths):
@@ -114,13 +111,10 @@ def compute_interpolation_weights(inputs, keypoints, lengths):
   weights = (inputs - keypoints) / lengths
   weights = tf.minimum(weights, 1.0)
   weights = tf.maximum(weights, 0.0)
-  # Prepend 1.0 at the beginning to add bias unconditionally. Worth testing
-  # different strategies, including those commented out, on different hardware.
   if len(keypoints.shape) == 1:
     return tf.concat([tf.ones_like(inputs), weights], axis=-1)
-  else:
-    shape = tf.concat([tf.shape(weights)[:-1], [1]], axis=0)
-    return tf.concat([tf.ones(shape), weights], axis=-1)
+  shape = tf.concat([tf.shape(weights)[:-1], [1]], axis=0)
+  return tf.concat([tf.ones(shape), weights], axis=-1)
   # return tf.concat([tf.ones_like(weights)[..., :1], weights], axis=-1)
   # return tf.concat([tf.ones_like(weights[..., :1]), weights], axis=-1)
   # paddings = [[0, 0]] * (len(weights.shape) - 1) + [[1, 0]]
@@ -176,7 +170,7 @@ def linear_initializer(shape,
   else:
     keypoints_tensor = tf.constant(
         keypoints, shape=[num_keypoints, 1], dtype=dtype)
-    lengths_tensor = keypoints_tensor[1:] - keypoints_tensor[0:-1]
+    lengths_tensor = keypoints_tensor[1:] - keypoints_tensor[:-1]
     output_range = output_max - output_min
     heights_tensor = (
         lengths_tensor * (output_range / tf.reduce_sum(lengths_tensor)))
@@ -237,7 +231,7 @@ def _approximately_project_bounds_only(bias, heights, output_min, output_max,
   if output_max_constraints == BoundConstraintsType.BOUND:
     sums = tf.minimum(sums, output_max)
 
-  bias = sums[0:1]
+  bias = sums[:1]
   heights = sums[1:] - sums[:-1]
   return bias, heights
 
@@ -347,13 +341,10 @@ def _project_bounds_considering_monotonicity(bias, heights, monotonicity,
       # We need only to squeeze it.
       heights_delta = tf.minimum(heights_delta, 0.0)
     heights += heights_delta
-  else:
-    # No need to do anything with heights if there are no output_max
-    # constraints.
-    if output_min_constraints == bct.CLAMPED:
-      bias = tf.constant(output_min, shape=bias.shape, dtype=bias.dtype)
-    elif output_min_constraints == bct.BOUND:
-      bias = tf.maximum(bias, output_min)
+  elif output_min_constraints == bct.CLAMPED:
+    bias = tf.constant(output_min, shape=bias.shape, dtype=bias.dtype)
+  elif output_min_constraints == bct.BOUND:
+    bias = tf.maximum(bias, output_min)
 
   return bias, heights
 
@@ -400,8 +391,8 @@ def _project_convexity(heights, lengths, convexity, constraint_group):
       lengths=lengths,
       weights_shape=[heights.shape[0] + 1, heights.shape[1]])
   if constraint_group not in [0, 1]:
-    raise ValueError("constraint_group must be one of: [0, 1]. "
-                     "Given: %s" % constraint_group)
+    raise ValueError(
+        f"constraint_group must be one of: [0, 1]. Given: {constraint_group}")
 
   if convexity == 0 or heights.shape[0] == 1:
     return heights
@@ -416,15 +407,12 @@ def _project_convexity(heights, lengths, convexity, constraint_group):
   # same number of elements.
   num_0 = (num_heights - constraint_group + 1) // 2
   num_1 = (num_heights - constraint_group) // 2
-  if num_1 == num_0:
-    last_index = None
-  else:
-    last_index = -1
-  heights_0 = heights[constraint_group:last_index:2]
+  last_index = None if num_1 == num_0 else -1
   lengths_0 = lengths[constraint_group:last_index:2]
   heights_1 = heights[constraint_group + 1::2]
   lengths_1 = lengths[constraint_group + 1::2]
 
+  heights_0 = heights[constraint_group:last_index:2]
   # h0_prime = (l0 / (l0 + l1)) * (h0 + h1) = l0 * base
   # h1_prime = (l1 / (l0 + l1)) * (h0 + h1) = l1 * base
   base = (heights_0 + heights_1) / (lengths_0 + lengths_1)
@@ -449,7 +437,7 @@ def _project_convexity(heights, lengths, convexity, constraint_group):
   weights_pieces = [projected_heights]
   if constraint_group == 1:
     # First height was skipped during initial split.
-    weights_pieces = [heights[0:1]] + weights_pieces
+    weights_pieces = [heights[:1]] + weights_pieces
   if last_index == -1:
     # Last height was skipped during initial split.
     weights_pieces.append(heights[-1:])
@@ -522,7 +510,7 @@ def project_all_constraints(weights,
   Returns:
     Projected weights tensor.
   """
-  bias = weights[0:1]
+  bias = weights[:1]
   heights = weights[1:]
 
   def body(projection_counter, bias, heights, last_bias_change,
@@ -872,10 +860,10 @@ def assert_constraints(outputs,
               summarize=outputs.shape[0]))
 
   if monotonicity not in [-1, 0, 1]:
-    raise ValueError("'monotonicity' must be one of: [-1, 0, 1]. It is: %s" %
-                     monotonicity)
+    raise ValueError(
+        f"'monotonicity' must be one of: [-1, 0, 1]. It is: {monotonicity}")
   if monotonicity != 0:
-    diffs = (outputs[1:] - outputs[0:-1])
+    diffs = outputs[1:] - outputs[:-1]
     asserts.append(
         tf.Assert(
             tf.reduce_min(diffs * monotonicity) >= -eps,
@@ -922,36 +910,34 @@ def verify_hyperparameters(input_keypoints=None,
       if len(input_keypoints) < 2:
         raise ValueError("At least 2 input keypoints must be provided. "
                          "Given: " + str(input_keypoints))
-      if not all(input_keypoints[i] < input_keypoints[i + 1]
-                 for i in range(len(input_keypoints) - 1)):
+      if any(input_keypoints[i] >= input_keypoints[i + 1]
+             for i in range(len(input_keypoints) - 1)):
         raise ValueError("Keypoints must be strictly increasing. They are: " +
                          str(input_keypoints))
 
-  if output_min is not None and output_max is not None:
-    if output_max < output_min:
-      raise ValueError("If specified output_max must be greater than "
-                       "output_min. "
-                       "They are: ({}, {})".format(output_min, output_max))
+  if (output_min is not None and output_max is not None
+      and output_max < output_min):
+    raise ValueError(
+        f"If specified output_max must be greater than output_min. They are: ({output_min}, {output_max})"
+    )
 
   # It also raises errors if monotonicities specified incorrectly.
   monotonicity = utils.canonicalize_monotonicity(monotonicity)
   convexity = utils.canonicalize_convexity(convexity)
 
   if is_cyclic and (monotonicity or convexity):
-    raise ValueError("'is_cyclic' can not be specified together with "
-                     "'monotonicity'({}) or 'convexity'({}).".format(
-                         monotonicity, convexity))
+    raise ValueError(
+        f"'is_cyclic' can not be specified together with 'monotonicity'({monotonicity}) or 'convexity'({convexity})."
+    )
 
-  if weights_shape is not None:
-    if len(weights_shape) != 2 or weights_shape[0] < 2:
-      raise ValueError("PWLCalibrator weights must have shape: [k, units] where"
-                       " k > 1. It is: " + str(weights_shape))
+  if weights_shape is not None and (len(weights_shape) != 2
+                                    or weights_shape[0] < 2):
+    raise ValueError(
+        f"PWLCalibrator weights must have shape: [k, units] where k > 1. It is: {str(weights_shape)}"
+    )
 
   if lengths is not None and weights_shape is not None:
-    if tf.is_tensor(lengths):
-      num_lengths = lengths.shape[0]
-    else:
-      num_lengths = len(lengths)
+    num_lengths = lengths.shape[0] if tf.is_tensor(lengths) else len(lengths)
     if num_lengths + 1 != weights_shape[0]:
       raise ValueError("Number of lengths must be equal to number of weights "
                        "minus one. Lengths: %s, weights_shape: %s" %
@@ -960,5 +946,5 @@ def verify_hyperparameters(input_keypoints=None,
   if (input_keypoints_type is not None and input_keypoints_type != "fixed" and
       input_keypoints_type != "learned_interior"):
     raise ValueError(
-        "input_keypoints_type must be one of 'fixed' or 'learned_interior': %s"
-        % input_keypoints_type)
+        f"input_keypoints_type must be one of 'fixed' or 'learned_interior': {input_keypoints_type}"
+    )

@@ -59,21 +59,20 @@ def verify_hyperparameters(lattice_size,
 
   """
   if lattice_size < 2:
-    raise ValueError(
-        "Lattice size must be at least 2. Given: {}".format(lattice_size))
+    raise ValueError(f"Lattice size must be at least 2. Given: {lattice_size}")
 
-  if input_shape:
-    if isinstance(input_shape, dict):
-      for key in input_shape:
-        if key not in ["unconstrained", "increasing"]:
-          raise KeyError("Input shape keys should be either 'unconstrained' "
-                         "or 'increasing', but seeing: {}".format(key))
+  if input_shape and isinstance(input_shape, dict):
+    for key in input_shape:
+      if key not in ["unconstrained", "increasing"]:
+        raise KeyError(
+            f"Input shape keys should be either 'unconstrained' or 'increasing', but seeing: {key}"
+        )
 
-  if output_min is not None and output_max is not None:
-    if output_min >= output_max:
-      raise ValueError("'output_min' must be not greater than 'output_max'. "
-                       "'output_min': %f, 'output_max': %f" %
-                       (output_min, output_max))
+  if (output_min is not None and output_max is not None
+      and output_min >= output_max):
+    raise ValueError("'output_min' must be not greater than 'output_max'. "
+                     "'output_min': %f, 'output_max': %f" %
+                     (output_min, output_max))
 
   if interpolation not in ["hypercube", "simplex"]:
     raise ValueError("RTL interpolation type should be either 'simplex' "
@@ -93,21 +92,17 @@ def verify_hyperparameters(lattice_size,
                      "'kernel_regularizer': %s" %
                      (parameterization, kernel_regularizer))
 
-  if kernel_regularizer:
-    if isinstance(kernel_regularizer, list):
-      regularizers = kernel_regularizer
-      if isinstance(kernel_regularizer[0], six.string_types):
-        regularizers = [kernel_regularizer]
-      for regularizer in regularizers:
-        if len(regularizer) != 3:
-          raise ValueError("Regularizer tuples/lists must have three elements "
-                           "(type, l1, and l2). Given: {}".format(regularizer))
-        _, l1, l2 = regularizer
-        if not isinstance(l1, float):
-          raise ValueError(
-              "Regularizer l1 must be a single float. Given: {}".format(
-                  type(l1)))
-        if not isinstance(l2, float):
-          raise ValueError(
-              "Regularizer l2 must be a single float. Given: {}".format(
-                  type(l2)))
+  if kernel_regularizer and isinstance(kernel_regularizer, list):
+    regularizers = kernel_regularizer
+    if isinstance(kernel_regularizer[0], six.string_types):
+      regularizers = [kernel_regularizer]
+    for regularizer in regularizers:
+      if len(regularizer) != 3:
+        raise ValueError(
+            f"Regularizer tuples/lists must have three elements (type, l1, and l2). Given: {regularizer}"
+        )
+      _, l1, l2 = regularizer
+      if not isinstance(l1, float):
+        raise ValueError(f"Regularizer l1 must be a single float. Given: {type(l1)}")
+      if not isinstance(l2, float):
+        raise ValueError(f"Regularizer l2 must be a single float. Given: {type(l2)}")

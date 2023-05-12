@@ -153,12 +153,12 @@ class CDF(tf.keras.layers.Layer):
     input_dim = int(input_shape[-1])
     if input_dim % self.sparsity_factor != 0:
       raise ValueError(
-          "sparsity_factor ({}) must be a divisor of input_dim ({})".format(
-              self.sparsity_factor, input_dim))
+          f"sparsity_factor ({self.sparsity_factor}) must be a divisor of input_dim ({input_dim})"
+      )
     if self.units % self.sparsity_factor != 0:
       raise ValueError(
-          "sparsity_factor ({}) must be a divisor of units ({})".format(
-              self.sparsity_factor, self.units))
+          f"sparsity_factor ({self.sparsity_factor}) must be a divisor of units ({self.units})"
+      )
 
     # Each keypoint represents a step function defined by the activation
     # function specified. For an activation like relu6, this represents the
@@ -191,8 +191,7 @@ class CDF(tf.keras.layers.Layer):
           if self.input_scaling_monotonicity else None,
           shape=[1, input_dim, 1, 1])
     else:
-      raise ValueError("Invalid input_scaling_type: {}".format(
-          self.input_scaling_type))
+      raise ValueError(f"Invalid input_scaling_type: {self.input_scaling_type}")
 
   def call(self, inputs):
     """Standard Keras call() method."""
@@ -210,7 +209,7 @@ class CDF(tf.keras.layers.Layer):
       cdfs = tf.reduce_mean(
           tf.nn.sigmoid(self.input_scaling * (x - self.kernel)), axis=2)
     else:
-      raise ValueError("Invalid activation: {}".format(self.activation))
+      raise ValueError(f"Invalid activation: {self.activation}")
 
     result = cdfs
 
@@ -231,7 +230,7 @@ class CDF(tf.keras.layers.Layer):
       # we use the log form above so that we can add the epsilon term
       # tf.pow(tf.reduce_prod(cdfs, axis=1), 1. / num_terms)
     elif self.reduction != "none":
-      raise ValueError("Invalid reduction: {}".format(self.reduction))
+      raise ValueError(f"Invalid reduction: {self.reduction}")
 
     return result
 
@@ -257,7 +256,7 @@ class CDF(tf.keras.layers.Layer):
         "kernel_initializer":
             tf.keras.initializers.serialize(self.kernel_initializer),
     }
-    config.update(super(CDF, self).get_config())
+    config |= super(CDF, self).get_config()
     return config
 
 

@@ -48,8 +48,9 @@ def canonicalize_convexity(convexity):
       return 0
     if convexity.lower() == "convex":
       return 1
-  raise ValueError("'convexity' must be from: [-1, 0, 1, 'concave', "
-                   "'none', 'convex']. Given: {}".format(convexity))
+  raise ValueError(
+      f"'convexity' must be from: [-1, 0, 1, 'concave', 'none', 'convex']. Given: {convexity}"
+  )
 
 
 def canonicalize_input_bounds(input_bounds):
@@ -75,9 +76,9 @@ def canonicalize_input_bounds(input_bounds):
       elif isinstance(item, six.string_types) and item.lower() == "none":
         canonicalized.append(None)
       else:
-        raise ValueError("Both 'input_min' and 'input_max' elements must be "
-                         "either int, float, None, or 'none'. Given: {}".format(
-                             input_bounds))
+        raise ValueError(
+            f"Both 'input_min' and 'input_max' elements must be either int, float, None, or 'none'. Given: {input_bounds}"
+        )
     return canonicalized
   return None
 
@@ -107,22 +108,23 @@ def canonicalize_monotonicity(monotonicity, allow_decreasing=True):
   if monotonicity in [-1, 0, 1]:
     if not allow_decreasing and monotonicity == -1:
       raise ValueError(
-          "'monotonicities' must be from: [0, 1, 'none', 'increasing']. "
-          "Given: {}".format(monotonicity))
+          f"'monotonicities' must be from: [0, 1, 'none', 'increasing']. Given: {monotonicity}"
+      )
     return monotonicity
   elif isinstance(monotonicity, six.string_types):
     if monotonicity.lower() == "decreasing":
       if not allow_decreasing:
         raise ValueError(
-            "'monotonicities' must be from: [0, 1, 'none', 'increasing']. "
-            "Given: {}".format(monotonicity))
+            f"'monotonicities' must be from: [0, 1, 'none', 'increasing']. Given: {monotonicity}"
+        )
       return -1
     if monotonicity.lower() == "none":
       return 0
     if monotonicity.lower() == "increasing":
       return 1
-  raise ValueError("'monotonicities' must be from: [-1, 0, 1, 'decreasing', "
-                   "'none', 'increasing']. Given: {}".format(monotonicity))
+  raise ValueError(
+      f"'monotonicities' must be from: [-1, 0, 1, 'decreasing', 'none', 'increasing']. Given: {monotonicity}"
+  )
 
 
 def canonicalize_monotonicities(monotonicities, allow_decreasing=True):
@@ -171,26 +173,28 @@ def canonicalize_trust(trusts):
     ValueError: If one of trust constraints' direction is not in the set
       {-1, 1, 'negative', 'positive'}.
   """
-  if trusts:
-    canonicalized = []
-    for trust in trusts:
-      if len(trust) != 3:
-        raise ValueError("Trust constraints must consist of 3 elements. Seeing "
-                         "constraint tuple {}".format(trust))
-      feature_a, feature_b, direction = trust
-      if direction in [-1, 1]:
-        canonicalized.append(trust)
-      elif (isinstance(direction, six.string_types) and
-            direction.lower() == "negative"):
-        canonicalized.append((feature_a, feature_b, -1))
-      elif (isinstance(direction, six.string_types) and
-            direction.lower() == "positive"):
-        canonicalized.append((feature_a, feature_b, 1))
-      else:
-        raise ValueError("trust constraint direction must be from: [-1, 1, "
-                         "'negative', 'positive']. Given: {}".format(direction))
-    return canonicalized
-  return None
+  if not trusts:
+    return None
+  canonicalized = []
+  for trust in trusts:
+    if len(trust) != 3:
+      raise ValueError(
+          f"Trust constraints must consist of 3 elements. Seeing constraint tuple {trust}"
+      )
+    feature_a, feature_b, direction = trust
+    if direction in [-1, 1]:
+      canonicalized.append(trust)
+    elif (isinstance(direction, six.string_types) and
+          direction.lower() == "negative"):
+      canonicalized.append((feature_a, feature_b, -1))
+    elif (isinstance(direction, six.string_types) and
+          direction.lower() == "positive"):
+      canonicalized.append((feature_a, feature_b, 1))
+    else:
+      raise ValueError(
+          f"trust constraint direction must be from: [-1, 1, 'negative', 'positive']. Given: {direction}"
+      )
+  return canonicalized
 
 
 def canonicalize_unimodalities(unimodalities):
@@ -224,8 +228,8 @@ def canonicalize_unimodalities(unimodalities):
       canonicalized.append(1)
     else:
       raise ValueError(
-          "'unimodalities' elements must be from: [-1, 0, 1, 'peak', 'none', "
-          "'valley']. Given: {}".format(unimodalities))
+          f"'unimodalities' elements must be from: [-1, 0, 1, 'peak', 'none', 'valley']. Given: {unimodalities}"
+      )
   return canonicalized
 
 
@@ -235,8 +239,6 @@ def count_non_zeros(*iterables):
   Args:
     *iterables: Any number of the value None or iterables of numeric values.
   """
-  result = 0
-  for iterable in iterables:
-    if iterable is not None:
-      result += sum(1 for element in iterable if element != 0)
-  return result
+  return sum(
+      sum(1 for element in iterable if element != 0) for iterable in iterables
+      if iterable is not None)

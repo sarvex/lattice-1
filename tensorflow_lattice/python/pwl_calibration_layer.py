@@ -273,7 +273,7 @@ class PWLCalibration(keras.layers.Layer):
             self.kernel_regularizer.append(
                 WrinkleRegularizer(l1=l1, l2=l2, is_cyclic=self.is_cyclic))
           else:
-            raise ValueError("Unknown custom lattice regularizer: %s" % reg)
+            raise ValueError(f"Unknown custom lattice regularizer: {reg}")
         else:
           # This is needed for Keras deserialization logic to be aware of our
           # custom objects.
@@ -422,8 +422,7 @@ class PWLCalibration(keras.layers.Layer):
               (str(is_missing.shape), str(inputs.shape)))
       else:
         [inputs] = inputs
-    if len(inputs.shape) != 2 or (inputs.shape[1] != self.units and
-                                  inputs.shape[1] != 1):
+    if len(inputs.shape) != 2 or inputs.shape[1] not in [self.units, 1]:
       raise ValueError("Shape of input tensor for PWLCalibration layer must be "
                        "[-1, units] or [-1, 1]. It is: " + str(inputs.shape))
 
@@ -524,7 +523,7 @@ class PWLCalibration(keras.layers.Layer):
         "split_outputs": self.split_outputs,
         "input_keypoints_type": self.input_keypoints_type,
     }  # pyformat: disable
-    config.update(super(PWLCalibration, self).get_config())
+    config |= super(PWLCalibration, self).get_config()
     return config
 
   def assert_constraints(self, eps=1e-6):
@@ -575,7 +574,7 @@ class PWLCalibration(keras.layers.Layer):
     """Returns tensor of keypoint outputs of shape [num_weights, num_units]."""
     kp_outputs = tf.cumsum(self.kernel)
     if self.is_cyclic:
-      kp_outputs = tf.concat([kp_outputs, kp_outputs[0:1]], axis=0)
+      kp_outputs = tf.concat([kp_outputs, kp_outputs[:1]], axis=0)
     return kp_outputs
 
   def keypoints_inputs(self):
@@ -925,11 +924,7 @@ class HessianRegularizer(keras.regularizers.Regularizer):
     if self.is_cyclic:
       heights = x[1:]
       heights = tf.concat(
-          [
-              heights,
-              -tf.reduce_sum(heights, axis=0, keepdims=True),
-              heights[0:1],
-          ],
+          [heights, -tf.reduce_sum(heights, axis=0, keepdims=True), heights[:1]],
           axis=0,
       )
       nonlinearity = heights[1:] - heights[:-1]
@@ -1011,7 +1006,7 @@ class WrinkleRegularizer(keras.regularizers.Regularizer):
           [
               heights,
               -tf.reduce_sum(heights, axis=0, keepdims=True),
-              heights[0:1],
+              heights[:1],
               heights[1:2],
           ],
           axis=0,
@@ -1019,7 +1014,7 @@ class WrinkleRegularizer(keras.regularizers.Regularizer):
       nonlinearity = heights[1:] - heights[:-1]
     else:
       nonlinearity = x[2:] - x[1:-1]
-    wrinkleness = nonlinearity[1:] - nonlinearity[0:-1]
+    wrinkleness = nonlinearity[1:] - nonlinearity[:-1]
 
     losses = []
     if self.l1:

@@ -64,8 +64,7 @@ def _inline_svg_images(image_path):
 
   cElementTree.register_namespace('', 'http://www.w3.org/2000/svg')
   cElementTree.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
-  xml_str = cElementTree.tostring(root).decode()
-  return xml_str
+  return cElementTree.tostring(root).decode()
 
 
 def _display(image_path, image_format):
@@ -75,8 +74,7 @@ def _display(image_path, image_format):
     # Inline embedded SVG data and wrap inside an HTML display object.
     svg = _inline_svg_images(image_path)
     svg_base64 = base64.b64encode(svg.encode('utf-8')).decode()
-    html = '<img width="100%" src="data:image/svg+xml;base64,{}" >'.format(
-        svg_base64)
+    html = f'<img width="100%" src="data:image/svg+xml;base64,{svg_base64}" >'
     IPython.display.display(IPython.display.HTML(html))
   else:
     IPython.display.display(IPython.display.Image(image_path))
@@ -110,20 +108,24 @@ def draw_model_graph(model_graph,
   # Check if we need split nodes for shared calibration
   model_has_shared_calibration = False
   for node in model_graph.nodes:
-    model_has_shared_calibration |= (
-        (isinstance(node, model_info.PWLCalibrationNode) or
-         isinstance(node, model_info.CategoricalCalibrationNode)) and
-        (len(_output_nodes(model_graph, node)) > 1))
+    model_has_shared_calibration |= (isinstance(
+        node,
+        (
+            model_info.PWLCalibrationNode,
+            model_info.CategoricalCalibrationNode,
+        ),
+    )) and len(_output_nodes(model_graph, node)) > 1
 
   split_nodes = {}
   for node in model_graph.nodes:
     node_id = _node_id(node)
-    if (isinstance(node, model_info.PWLCalibrationNode) or
-        isinstance(node, model_info.CategoricalCalibrationNode)):
+    if isinstance(
+        node,
+        (model_info.PWLCalibrationNode, model_info.CategoricalCalibrationNode),
+    ):
       # Add node for calibrator with calibrator plot inside.
       fig = plot_calibrator_nodes([node], figsize=calibrator_figsize)
-      filename = os.path.join(tempfile.tempdir,
-                              'i{}.{}'.format(node_id, image_format))
+      filename = os.path.join(tempfile.tempdir, f'i{node_id}.{image_format}')
       plt.savefig(filename, dpi=calibrator_dpi)
       plt.close(fig)
       dot.node(node_id, '', image=filename, imagescale='true', shape='box')
@@ -132,25 +134,25 @@ def draw_model_graph(model_graph,
       node_is_feature_calibration = isinstance(node.input_node,
                                                model_info.InputFeatureNode)
       if node_is_feature_calibration:
-        input_node_id = node_id + 'input'
+        input_node_id = f'{node_id}input'
         dot.node(input_node_id, node.input_node.name)
-        dot.edge(input_node_id + ':s', node_id + ':n')
+        dot.edge(f'{input_node_id}:s', f'{node_id}:n')
 
         # Add split node for shared calibration.
         if model_has_shared_calibration:
-          split_node_id = node_id + 'calibrated'
-          split_node_name = 'calibrated {}'.format(node.input_node.name)
+          split_node_id = f'{node_id}calibrated'
+          split_node_name = f'calibrated {node.input_node.name}'
           dot.node(split_node_id, split_node_name)
-          dot.edge(node_id + ':s', split_node_id + ':n')
+          dot.edge(f'{node_id}:s', f'{split_node_id}:n')
           split_nodes[node_id] = (split_node_id, split_node_name)
 
     elif not isinstance(node, model_info.InputFeatureNode):
       dot.node(node_id, _node_name(node), shape='box', margin='0.3')
 
     if node is model_graph.output_node:
-      output_node_id = node_id + 'output'
+      output_node_id = f'{node_id}output'
       dot.node(output_node_id, 'output')
-      dot.edge(node_id + ':s', output_node_id)
+      dot.edge(f'{node_id}:s', output_node_id)
 
   for node in model_graph.nodes:
     node_id = _node_id(node)
@@ -163,7 +165,7 @@ def draw_model_graph(model_graph,
         input_node_id = split_node_id + node_id
         dot.node(input_node_id, split_node_name)
 
-      dot.edge(input_node_id + ':s', node_id)  # + ':n')
+      dot.edge(f'{input_node_id}:s', node_id)
 
   filename = os.path.join(tempfile.tempdir, 'dot')
   try:
@@ -174,9 +176,8 @@ def draw_model_graph(model_graph,
       # Similar to Keras visualization lib, we don't raise an exception here to
       # avoid crashing notebooks during tests.
       print(
-          'dot binaries were not found or not in PATH. The system running the '
-          'colab binary might not have graphviz package installed: format({})'
-          .format(e))
+          f'dot binaries were not found or not in PATH. The system running the colab binary might not have graphviz package installed: format({e})'
+      )
     else:
       raise e
 
@@ -216,7 +217,7 @@ def plot_calibrator_nodes(nodes,
     elif isinstance(nodes[0], model_info.CategoricalCalibrationNode):
       _plot_categorical_calibrator(nodes, axes, plot_submodel_calibration)
     else:
-      raise ValueError('Unknown calibrator type: {}'.format(nodes[0]))
+      raise ValueError(f'Unknown calibrator type: {nodes[0]}')
     plt.tight_layout()
 
   return fig
@@ -256,8 +257,7 @@ def plot_feature_calibrator(model_graph,
       if input_feature_node.name == feature_name
   ]
   if not input_feature_node:
-    raise ValueError(
-        'Feature "{}" not found in the model_graph.'.format(feature_name))
+    raise ValueError(f'Feature "{feature_name}" not found in the model_graph.')
 
   input_feature_node = input_feature_node[0]
   calibrator_nodes = _output_nodes(model_graph, input_feature_node)
@@ -308,7 +308,7 @@ def plot_all_calibrators(model_graph, num_cols=4, image_format='png', **kwargs):
     if index < num_feature_calibrators:
       feature_name = feature_names[index]
       tb = google.colab.widgets.TabBar(
-          ['Calibrator for "{}"'.format(feature_name), 'Large Plot'])
+          [f'Calibrator for "{feature_name}"', 'Large Plot'])
     else:
       feature_name = 'output'
       tb = google.colab.widgets.TabBar(['Output calibration', 'Large Plot'])
@@ -318,8 +318,7 @@ def plot_all_calibrators(model_graph, num_cols=4, image_format='png', **kwargs):
         plot_feature_calibrator(model_graph, feature_name, **kwargs)
       else:
         plot_calibrator_nodes([output_calibrator_node], **kwargs)
-      image_path = os.path.join(tempfile.tempdir,
-                                '{}.{}'.format(feature_name, image_format))
+      image_path = os.path.join(tempfile.tempdir, f'{feature_name}.{image_format}')
       # Save a larger temporary copy to be shown in a second tab.
       plt.savefig(image_path, dpi=200)
       plt.show()
@@ -335,7 +334,7 @@ def _input_feature_nodes(model_graph):
 
 
 def _node_id(node):
-  return str(id(node))
+  return id(node)
 
 
 def _node_name(node):
@@ -345,9 +344,7 @@ def _node_name(node):
     return 'Lattice'
   if isinstance(node, model_info.KroneckerFactoredLatticeNode):
     return 'KroneckerFactoredLattice'
-  if isinstance(node, model_info.MeanNode):
-    return 'Average'
-  return str(type(node))
+  return 'Average' if isinstance(node, model_info.MeanNode) else str(type(node))
 
 
 def _contains(nodes, node):
@@ -357,9 +354,7 @@ def _contains(nodes, node):
 def _input_nodes(node):
   if hasattr(node, 'input_nodes'):
     return node.input_nodes
-  if hasattr(node, 'input_node'):
-    return [node.input_node]
-  return []
+  return [node.input_node] if hasattr(node, 'input_node') else []
 
 
 def _output_nodes(model_graph, node):
@@ -449,7 +444,7 @@ def _plot_categorical_calibrator(categorical_calibrator_nodes, axes,
 
   # Set axes labels and tick values.
   plt.xlabel(feature_info.name)
-  plt.ylabel('calibrated {}'.format(feature_info.name))
+  plt.ylabel(f'calibrated {feature_info.name}')
   axes.set_xticks(x)
   axes.set_xticklabels(input_values)
   axes.yaxis.grid(True, linewidth=0.25)
@@ -477,7 +472,7 @@ def _plot_pwl_calibrator(pwl_calibrator_nodes, axes, plot_submodel_calibration):
                 model_info.InputFeatureNode):
     assert not pwl_calibrator_nodes[0].input_node.is_categorical
     input_name = pwl_calibrator_nodes[0].input_node.name
-    output_name = 'calibrated {}'.format(input_name)
+    output_name = f'calibrated {input_name}'
   else:
     # Output PWL calibration.
     input_name = 'input'
@@ -519,8 +514,8 @@ def _plot_pwl_calibrator(pwl_calibrator_nodes, axes, plot_submodel_calibration):
   # Skip plotting average keypoint outputs if input keypoints are not aligned.
   all_input_keypoints = np.stack(
       [node.input_keypoints for node in pwl_calibrator_nodes])
-  input_keypoints_match = (all_input_keypoints == all_input_keypoints[0]).all()
-  if input_keypoints_match:
+  if input_keypoints_match := (
+      all_input_keypoints == all_input_keypoints[0]).all():
     plt.plot(
         pwl_calibrator_nodes[0].input_keypoints,
         mean_output_keypoints,

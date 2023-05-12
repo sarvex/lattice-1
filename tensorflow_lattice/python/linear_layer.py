@@ -146,7 +146,7 @@ class Linear(keras.layers.Layer):
     self.num_input_dims = num_input_dims
     self.units = units
 
-    if isinstance(monotonicities, list) or isinstance(monotonicities, tuple):
+    if isinstance(monotonicities, (list, tuple)):
       self.monotonicities = list(monotonicities)
     elif monotonicities is not None:
       self.monotonicities = [monotonicities] * self.num_input_dims
@@ -172,15 +172,14 @@ class Linear(keras.layers.Layer):
     if kernel_regularizer:
       if callable(kernel_regularizer):
         kernel_regularizer = [kernel_regularizer]
-      for reg in kernel_regularizer:
-        self.kernel_regularizer.append(keras.regularizers.get(reg))
+      self.kernel_regularizer.extend(
+          keras.regularizers.get(reg) for reg in kernel_regularizer)
     self.bias_regularizer = []
     if bias_regularizer:
       if callable(bias_regularizer):
         bias_regularizer = [bias_regularizer]
-      for reg in bias_regularizer:
-        self.bias_regularizer.append(keras.regularizers.get(reg))
-
+      self.bias_regularizer.extend(
+          keras.regularizers.get(reg) for reg in bias_regularizer)
     if units == 1:
       input_shape = (None, num_input_dims)
     else:
@@ -309,7 +308,7 @@ class Linear(keras.layers.Layer):
           keras.regularizers.serialize(r) for r in self.bias_regularizer
       ]
 
-    config.update(super(Linear, self).get_config())
+    config |= super(Linear, self).get_config()
     return config
 
   # Default eps is bigger than one for other layers because normalization is

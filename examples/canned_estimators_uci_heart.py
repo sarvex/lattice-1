@@ -240,9 +240,10 @@ def main(_):
       optimizer=tf.keras.optimizers.Adam(FLAGS.learning_rate))
   estimator.train(input_fn=train_input_fn)
   results = estimator.evaluate(input_fn=test_input_fn)
-  print('Calibrated linear results: {}'.format(results))
-  print('Calibrated linear model exported to {}'.format(
-      estimator.export_saved_model(estimator.model_dir, serving_input_fn)))
+  print(f'Calibrated linear results: {results}')
+  print(
+      f'Calibrated linear model exported to {estimator.export_saved_model(estimator.model_dir, serving_input_fn)}'
+  )
 
   # This is calibrated lattice model: Inputs are calibrated, then combined
   # non-linearly using a lattice layer.
@@ -261,9 +262,10 @@ def main(_):
       optimizer=tf.keras.optimizers.Adam(FLAGS.learning_rate))
   estimator.train(input_fn=train_input_fn)
   results = estimator.evaluate(input_fn=test_input_fn)
-  print('Calibrated lattice results: {}'.format(results))
-  print('Calibrated lattice model exported to {}'.format(
-      estimator.export_saved_model(estimator.model_dir, serving_input_fn)))
+  print(f'Calibrated lattice results: {results}')
+  print(
+      f'Calibrated lattice model exported to {estimator.export_saved_model(estimator.model_dir, serving_input_fn)}'
+  )
 
   # This is random lattice ensemble model with separate calibration:
   # model output is the average output of separately calibrated lattices.
@@ -286,9 +288,10 @@ def main(_):
       optimizer=tf.keras.optimizers.Adam(FLAGS.learning_rate))
   estimator.train(input_fn=train_input_fn)
   results = estimator.evaluate(input_fn=test_input_fn)
-  print('Random ensemble results: {}'.format(results))
-  print('Random ensemble model exported to {}'.format(
-      estimator.export_saved_model(estimator.model_dir, serving_input_fn)))
+  print(f'Random ensemble results: {results}')
+  print(
+      f'Random ensemble model exported to {estimator.export_saved_model(estimator.model_dir, serving_input_fn)}'
+  )
 
   # This is Crystals ensemble model with separate calibration: model output is
   # the average output of separately calibrated lattices.
@@ -317,9 +320,10 @@ def main(_):
       optimizer=tf.keras.optimizers.Adam(FLAGS.learning_rate))
   estimator.train(input_fn=train_input_fn)
   results = estimator.evaluate(input_fn=test_input_fn)
-  print('Crystals ensemble results: {}'.format(results))
-  print('Crystals ensemble model exported to {}'.format(
-      estimator.export_saved_model(estimator.model_dir, serving_input_fn)))
+  print(f'Crystals ensemble results: {results}')
+  print(
+      f'Crystals ensemble model exported to {estimator.export_saved_model(estimator.model_dir, serving_input_fn)}'
+  )
 
 
 if __name__ == '__main__':

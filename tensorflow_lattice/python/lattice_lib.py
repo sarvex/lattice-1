@@ -237,13 +237,10 @@ def compute_interpolation_weights(inputs, lattice_sizes, clip_inputs=True):
     inputs = _clip_onto_lattice_range(
         inputs=inputs, lattice_sizes=lattice_sizes)
 
-  # Create interpolation keypoints in advance in order to reuse them for all
-  # dimensions of same size.
-  dim_keypoints = {}
-  for dim_size in set(lattice_sizes):
-    dim_keypoints[dim_size] = tf.constant([i for i in range(dim_size)],
-                                          dtype=input_dtype)
-
+  dim_keypoints = {
+      dim_size: tf.constant(list(range(dim_size)), dtype=input_dtype)
+      for dim_size in set(lattice_sizes)
+  }
   # Bucketize in order to share interpolation ops across consequtive dims of
   # same size.
   bucketized_inputs = _bucketize_consequtive_equal_dims(
@@ -352,21 +349,19 @@ def _clip_onto_lattice_range(inputs, lattice_sizes):
         clip_value_min=tf.zeros(shape=len(lattice_sizes), dtype=inputs.dtype),
         clip_value_max=tf.constant(upper_bounds, dtype=inputs.dtype))
   else:
-    # Share bound constant across dimensions of same size.
-    dim_upper_bounds = {}
-    for dim_size in set(lattice_sizes):
-      dim_upper_bounds[dim_size] = tf.constant(
-          dim_size - 1.0, dtype=inputs[0].dtype)
+    dim_upper_bounds = {
+        dim_size: tf.constant(dim_size - 1.0, dtype=inputs[0].dtype)
+        for dim_size in set(lattice_sizes)
+    }
     dim_lower_bound = tf.zeros(shape=[], dtype=inputs[0].dtype)
 
-    clipped_inputs = []
-    for one_d_input, dim_size in zip(inputs, lattice_sizes):
-      clipped_inputs.append(
-          tf.clip_by_value(
-              one_d_input,
-              clip_value_min=dim_lower_bound,
-              clip_value_max=dim_upper_bounds[dim_size]))
-    return clipped_inputs
+    return [
+        tf.clip_by_value(
+            one_d_input,
+            clip_value_min=dim_lower_bound,
+            clip_value_max=dim_upper_bounds[dim_size],
+        ) for one_d_input, dim_size in zip(inputs, lattice_sizes)
+    ]
 
 
 def _bucketize_consequtive_equal_dims(inputs, lattice_sizes):
@@ -1023,7 +1018,7 @@ def _approximately_project_bounds(weights, units, output_min, output_max):
   elif output_max is not None and output_min is None:
     final_projection -= tf.maximum(
         tf.reduce_max(final_projection, axis=axis) - output_max, 0)
-  elif output_max is not None and output_min is not None:
+  elif output_max is not None:
     max_violation = tf.maximum(
         tf.reduce_max(final_projection, axis=axis) - output_max, 0)
     min_violation = tf.maximum(
@@ -1580,7 +1575,7 @@ def _project_partial_range_dominance(weights, lattice_sizes, range_dominance,
   layers = _unstack_nd(weights, [dom_dim, weak_dim])
   difference = ((layers[i][weak_dim_size - 1] - layers[i][0]) -
                 (layers[dom_dim_size - 1][j] - layers[0][j]))
-  if (i == 0 or i == dom_dim_size - 1) and (j == 0 or j == weak_dim_size - 1):
+  if i in [0, dom_dim_size - 1] and j in [0, weak_dim_size - 1]:
     correction = tf.maximum(difference / 2, 0)
     if i == 0:
       layers[dom_dim_size - 1][j] += correction
@@ -1725,7 +1720,7 @@ def _project_partial_joint_unimodality(weights, lattice_sizes,
   # _project_onto_hyperplane() to project.
   dimensions = joint_unimodalities[0]
   if len(vertex) != len(dimensions):
-    raise ValueError("%s %s" % (vertex, joint_unimodalities))
+    raise ValueError(f"{vertex} {joint_unimodalities}")
 
   upper_bound = [lattice_sizes[dim] for dim in dimensions]
   center = [size // 2 for size in upper_bound]
@@ -2139,14 +2134,14 @@ def laplacian_regularizer(weights, lattice_sizes, l1=0.0, l2=0.0):
       # Transpose so current dimension becomes first one in order to simplify
       # indexing and be able to merge all other dimensions into 1 for better TPU
       # performance.
-      permut = [p for p in range(rank)]
+      permut = list(range(rank))
       permut[0], permut[dim] = permut[dim], permut[0]
       slices = tf.transpose(weights, perm=permut)
     else:
       slices = weights
     slices = tf.reshape(slices, shape=[lattice_sizes[dim], -1])
 
-    diff = slices[1:] - slices[0:-1]
+    diff = slices[1:] - slices[:-1]
     if l1:
       result += tf.reduce_sum(tf.abs(diff)) * l1[dim]
     if l2:
@@ -2222,7 +2217,7 @@ def torsion_regularizer(weights, lattice_sizes, l1=0.0, l2=0.0):
         # Transpose so dimensions i and j become first in order to simplify
         # indexing and be able to merge all other dimensions into 1 for better
         # TPU performance.
-        permut = [p for p in range(rank)]
+        permut = list(range(rank))
         permut[0], permut[i] = permut[i], permut[0]
         permut[1], permut[j] = permut[j], permut[1]
         planes = tf.transpose(weights, perm=permut)
@@ -2339,29 +2334,28 @@ def verify_hyperparameters(lattice_sizes,
   """
   for size in lattice_sizes:
     if size < 2:
-      raise ValueError("All lattice sizes must be at least 2. Given: %s" %
-                       lattice_sizes)
+      raise ValueError(
+          f"All lattice sizes must be at least 2. Given: {lattice_sizes}")
 
   # It also raises errors if monotonicities specified incorrectly.
   monotonicities = utils.canonicalize_monotonicities(
       monotonicities, allow_decreasing=False)
-  if monotonicities is not None:
-    if len(monotonicities) != len(lattice_sizes):
-      raise ValueError("If provided 'monotonicities' should have same number "
-                       "of elements as 'lattice_sizes'. 'monotonicities': %s,"
-                       "'lattice_sizes: %s" % (monotonicities, lattice_sizes))
+  if monotonicities is not None and len(monotonicities) != len(lattice_sizes):
+    raise ValueError(
+        f"If provided 'monotonicities' should have same number of elements as 'lattice_sizes'. 'monotonicities': {monotonicities},'lattice_sizes: {lattice_sizes}"
+    )
 
   unimodalities = utils.canonicalize_unimodalities(unimodalities)
   if unimodalities is not None:
     if len(unimodalities) != len(lattice_sizes):
-      raise ValueError("If provided 'unimodalities' should have same number "
-                       "of elements as 'lattice_sizes'. 'unimodalities': %s, "
-                       "'lattice_sizes: %s" % (unimodalities, lattice_sizes))
+      raise ValueError(
+          f"If provided 'unimodalities' should have same number of elements as 'lattice_sizes'. 'unimodalities': {unimodalities}, 'lattice_sizes: {lattice_sizes}"
+      )
     for unimodality, dim_size in zip(unimodalities, lattice_sizes):
       if unimodality != 0 and dim_size < 3:
-        raise ValueError("Unimodal dimensions must have lattice size at "
-                         "least 3. unimodalities: %s, lattice_sizes: %s" %
-                         (unimodalities, lattice_sizes))
+        raise ValueError(
+            f"Unimodal dimensions must have lattice size at least 3. unimodalities: {unimodalities}, lattice_sizes: {lattice_sizes}"
+        )
 
   if monotonicities is not None and unimodalities is not None:
     for i, (monotonicity,
@@ -2380,16 +2374,17 @@ def verify_hyperparameters(lattice_sizes,
     main_dim, cond_dim, cond_direction = constraint
     if (main_dim >= len(lattice_sizes) or cond_dim >= len(lattice_sizes) or
         main_dim < 0 or cond_dim < 0):
-      raise ValueError("Dimensions constrained by trust constraints "
-                       "are not within the range of the lattice. "
-                       "'trust_dims': %s, %s, num_dims: %s" %
-                       (main_dim, cond_dim, len(lattice_sizes)))
+      raise ValueError(
+          f"Dimensions constrained by trust constraints are not within the range of the lattice. 'trust_dims': {main_dim}, {cond_dim}, num_dims: {len(lattice_sizes)}"
+      )
     if not isinstance(main_dim, int) or not isinstance(cond_dim, int):
-      raise ValueError("Trust constraint dimensions must be integers. Seeing "
-                       "main_dim %s and cond_dim %s" % (main_dim, cond_dim))
+      raise ValueError(
+          f"Trust constraint dimensions must be integers. Seeing main_dim {main_dim} and cond_dim {cond_dim}"
+      )
     if monotonicities[main_dim] != 1:
-      raise ValueError("Trust constraint's main feature must be "
-                       "monotonic. Dimension %s is not monotonic." % (main_dim))
+      raise ValueError(
+          f"Trust constraint's main feature must be monotonic. Dimension {main_dim} is not monotonic."
+      )
     if (main_dim, cond_dim) in dim_pairs_direction and dim_pairs_direction[
         (main_dim, cond_dim)] != cond_direction:
       raise ValueError("Cannot have two trust constraints on the same pair of "
@@ -2409,8 +2404,7 @@ def verify_hyperparameters(lattice_sizes,
     main_dims.add(main_dim)
     cond_dims.add(cond_dim)
     dim_pairs_direction[(main_dim, cond_dim)] = cond_direction
-  main_and_cond = main_dims.intersection(cond_dims)
-  if main_and_cond:
+  if main_and_cond := main_dims.intersection(cond_dims):
     raise ValueError("A feature cannot be both a main feature and a "
                      "conditional feature in trust constraints. "
                      "Seeing dimension %d in both" % (main_and_cond.pop()))
@@ -2425,53 +2419,55 @@ def verify_hyperparameters(lattice_sizes,
   if joint_monotonicities is not None:
     for i, constraint in enumerate(joint_monotonicities):
       if len(constraint) != 2:
-        raise ValueError("Joint monotonicities constraints must consist of 2 "
-                         "elements. Seeing constraint tuple %s" % (constraint,))
+        raise ValueError(
+            f"Joint monotonicities constraints must consist of 2 elements. Seeing constraint tuple {constraint}"
+        )
       dim1, dim2 = constraint
       if (dim1 >= len(lattice_sizes) or dim2 >= len(lattice_sizes) or
           dim1 < 0 or dim2 < 0):
-        raise ValueError("Dimensions constrained by joint monotonicity "
-                         "constraints are not within the range of the lattice. "
-                         "'dims': %s, %s, num_dims: %s" %
-                         (dim1, dim2, len(lattice_sizes)))
+        raise ValueError(
+            f"Dimensions constrained by joint monotonicity constraints are not within the range of the lattice. 'dims': {dim1}, {dim2}, num_dims: {len(lattice_sizes)}"
+        )
       if not isinstance(dim1, int) or not isinstance(dim2, int):
-        raise ValueError("Joint monotonicity constraint dimensions must be "
-                         "integers. Seeing dimensions %s, %s" % (dim1, dim2))
+        raise ValueError(
+            f"Joint monotonicity constraint dimensions must be integers. Seeing dimensions {dim1}, {dim2}"
+        )
 
   if joint_unimodalities is not None:
     for single_constraint in joint_unimodalities:
       dimensions, direction = single_constraint
-      if (not isinstance(direction, six.string_types) or
-          (direction.lower() != "valley" and direction.lower() != "peak")):
-        raise ValueError("Joint unimodality tuple must end with string 'valley'"
-                         " or 'peak' which represents unimodality direction. "
-                         "Given: %s" % (single_constraint,))
+      if not isinstance(direction,
+                        six.string_types) or direction.lower() not in [
+                            "valley", "peak"
+                        ]:
+        raise ValueError(
+            f"Joint unimodality tuple must end with string 'valley' or 'peak' which represents unimodality direction. Given: {single_constraint}"
+        )
       for dim in dimensions:
         if dim < 0 or dim >= len(lattice_sizes):
-          raise ValueError("Dimension constrained by joint unimodality is not "
-                           "within the range of the lattice. Joint unimodality "
-                           "dimension: %s, total number of dimensions: "
-                           "%s" % (dim, len(lattice_sizes)))
+          raise ValueError(
+              f"Dimension constrained by joint unimodality is not within the range of the lattice. Joint unimodality dimension: {dim}, total number of dimensions: {len(lattice_sizes)}"
+          )
         if not isinstance(dim, int):
-          raise ValueError("Joint unimodality constraint dimensions must be "
-                           "integer. Seeing: %s" % dim)
+          raise ValueError(
+              f"Joint unimodality constraint dimensions must be integer. Seeing: {dim}"
+          )
         if lattice_sizes[dim] < 3:
-          raise ValueError("Dimensions constrained for joint unimodality must "
-                           "have lattice size at least 3. "
-                           "Dim: %s has size: %s" % (dim, lattice_sizes[dim]))
+          raise ValueError(
+              f"Dimensions constrained for joint unimodality must have lattice size at least 3. Dim: {dim} has size: {lattice_sizes[dim]}"
+          )
         if monotonicities and monotonicities[dim] != 0:
           raise ValueError("Dimension %d constrained for joint_unimodalities "
                            "can not also by monotonic." % dim)
       dims_set = set(dimensions)
       if len(dims_set) != len(dimensions):
-        raise ValueError("All dimensions within single joint unimodality "
-                         "constraint must be distinct. "
-                         "Given: %s" % single_constraint)
+        raise ValueError(
+            f"All dimensions within single joint unimodality constraint must be distinct. Given: {single_constraint}"
+        )
 
   if weights_shape is not None:
     if len(weights_shape) != 2:
-      raise ValueError("Weights must have shape of rank-2. "
-                       "Given: %s" % weights_shape)
+      raise ValueError(f"Weights must have shape of rank-2. Given: {weights_shape}")
     expected_num_weights = 1
     for dim_size in lattice_sizes:
       expected_num_weights *= dim_size
@@ -2482,42 +2478,41 @@ def verify_hyperparameters(lattice_sizes,
                        (weights_shape, lattice_sizes, expected_num_weights))
 
   if input_shape is not None:
-    if not isinstance(input_shape, list):
-      if input_shape[-1] != len(lattice_sizes):
-        raise ValueError("Last dimension of input shape must have same number "
-                         "of elements as 'lattice_sizes'. 'input shape': %s, "
-                         "'lattice_sizes': %s" % (input_shape, lattice_sizes))
-      shape = input_shape
-    else:
+    if isinstance(input_shape, list):
       if len(input_shape) != len(lattice_sizes):
-        raise ValueError("If lattice input is provided as list of tensors their"
-                         " number must match lattice_sizes. 'input list': %s, "
-                         "'lattice_sizes': %s" % (input_shape, lattice_sizes))
+        raise ValueError(
+            f"If lattice input is provided as list of tensors their number must match lattice_sizes. 'input list': {input_shape}, 'lattice_sizes': {lattice_sizes}"
+        )
       shape = input_shape[0]
-    if units is not None:  # FYI: It is inside "if input_shape is not None:"
-      if units > 1 and (len(shape) < 3 or shape[-2] != units):
-        raise ValueError("If 'units' > 1 then input shape of Lattice layer must"
-                         " have rank at least 3 where second from last "
-                         "dimension is equal to 'units'. 'units': %s, "
-                         "input_shape: %s" % (units, input_shape))
-
-  if output_min is not None and output_max is not None:
-    if output_min >= output_max:
-      raise ValueError("'output_min' must be not greater than 'output_max'. "
-                       "'output_min': %f, 'output_max': %f" %
-                       (output_min, output_max))
-
-  if regularization_amount and isinstance(regularization_amount, (list, tuple)):
-    if len(regularization_amount) != len(lattice_sizes):
+    elif input_shape[-1] != len(lattice_sizes):
       raise ValueError(
-          "If %s losses are given per dimension their number must "
-          "match number of dimensions defined by lattice sizes. "
-          "l1: %s, lattice sizes: %s" %
-          (regularization_info, regularization_amount, lattice_sizes))
+          f"Last dimension of input shape must have same number of elements as 'lattice_sizes'. 'input shape': {input_shape}, 'lattice_sizes': {lattice_sizes}"
+      )
+    else:
+      shape = input_shape
+    if (units is not None and units > 1
+        and (len(shape) < 3 or shape[-2] != units)):
+      raise ValueError(
+          f"If 'units' > 1 then input shape of Lattice layer must have rank at least 3 where second from last dimension is equal to 'units'. 'units': {units}, input_shape: {input_shape}"
+      )
+
+  if (output_min is not None and output_max is not None
+      and output_min >= output_max):
+    raise ValueError("'output_min' must be not greater than 'output_max'. "
+                     "'output_min': %f, 'output_max': %f" %
+                     (output_min, output_max))
+
+  if (regularization_amount and isinstance(regularization_amount,
+                                           (list, tuple))
+      and len(regularization_amount) != len(lattice_sizes)):
+    raise ValueError(
+        f"If {regularization_info} losses are given per dimension their number must match number of dimensions defined by lattice sizes. l1: {regularization_amount}, lattice sizes: {lattice_sizes}"
+    )
 
   if interpolation not in ["hypercube", "simplex"]:
-    raise ValueError("Lattice interpolation type should be either 'simplex' "
-                     "or 'hypercube': %s" % interpolation)
+    raise ValueError(
+        f"Lattice interpolation type should be either 'simplex' or 'hypercube': {interpolation}"
+    )
 
 
 # TODO: investigate whether eps should be bigger.

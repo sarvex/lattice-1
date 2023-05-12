@@ -132,7 +132,7 @@ def _poll_for_file(filename):
   while not tf.io.gfile.exists(filename):
     time.sleep(_POLL_INTERVAL_SECS)
     if time.time() - start > _MAX_WAIT_TIME:
-      raise WaitTimeOutError('Waiting for file {} timed-out'.format(filename))
+      raise WaitTimeOutError(f'Waiting for file {filename} timed-out')
 
 
 def transform_features(features, feature_columns=None):
@@ -156,12 +156,11 @@ def transform_features(features, feature_columns=None):
       parsed_features = collections.OrderedDict()
       for feature_column in feature_columns:
         # pylint: disable=protected-access
-        if (isinstance(feature_column, fc._DenseColumn) or
-            isinstance(feature_column, fc2.DenseColumn)):
+        if isinstance(feature_column, (fc._DenseColumn, fc2.DenseColumn)):
           parsed_features[
               feature_column.name] = feature_column._transform_feature(features)
-        elif (isinstance(feature_column, fc._CategoricalColumn) or
-              isinstance(feature_column, fc2.CategoricalColumn)):
+        elif isinstance(feature_column,
+                        (fc._CategoricalColumn, fc2.CategoricalColumn)):
           if feature_column.num_oov_buckets:
             # If oov buckets are used, missing values are assigned to the last
             # oov bucket.
@@ -174,9 +173,8 @@ def transform_features(features, feature_columns=None):
                   default_value=default_value),
               shape=[-1, 1])
         else:
-          raise ValueError(
-              'Unsupported feature_column: {}'.format(feature_column))
-        # pylint: enable=protected-access
+          raise ValueError(f'Unsupported feature_column: {feature_column}')
+              # pylint: enable=protected-access
     else:
       parsed_features = collections.OrderedDict(features)
 
@@ -184,7 +182,7 @@ def transform_features(features, feature_columns=None):
       if len(tensor.shape) == 1:
         parsed_features[name] = tf.expand_dims(tensor, 1)
       elif len(tensor.shape) > 2 or tensor.shape[1] != 1:
-        raise ValueError('Only 1-d inputs are supported: {}'.format(tensor))
+        raise ValueError(f'Only 1-d inputs are supported: {tensor}')
 
   with tf.name_scope(FEATURES_SCOPE):
     for name, tensor in parsed_features.items():
@@ -224,13 +222,10 @@ def _materialize_locally(tensors, max_elements=1e6):
       pass
     concatenated_tensors = {}
     for k in tensors:
-      k_tensors = [split[k] for split in splits if split[k].size > 0]
-      # If k_tensors is empty, the np.concat call below would raise
-      # an exception below. So we test this condition here to provide
-      # a better error message.
-      if not k_tensors:
-        raise ValueError("Did not find any values for key: {}".format(k))
-      concatenated_tensors[k] = np.concatenate(k_tensors)
+      if k_tensors := [split[k] for split in splits if split[k].size > 0]:
+        concatenated_tensors[k] = np.concatenate(k_tensors)
+      else:
+        raise ValueError(f"Did not find any values for key: {k}")
     return concatenated_tensors
 
 
@@ -295,9 +290,8 @@ def _finalize_keypoints(model_config, config, feature_columns,
 
       if np.isnan(feature_values).any():
         raise ValueError(
-            'NaN values were observed for numeric feature `{}`. '
-            'Consider replacing the values in transform or input_fn.'.format(
-                feature_name))
+            f'NaN values were observed for numeric feature `{feature_name}`. Consider replacing the values in transform or input_fn.'
+        )
 
       # Before calculating keypoints, clip values as requested.
       # Add min and max to the value list to make sure min/max in values match
@@ -332,14 +326,13 @@ def _finalize_keypoints(model_config, config, feature_columns,
               np.min(feature_values), np.max(feature_values), num_keypoints)
           feature_keypoints[feature_name] = [float(x) for x in linspace]
         else:
-          raise ValueError(
-              'Invalid keypoint generation mode: {}'.format(keypoints))
+          raise ValueError(f'Invalid keypoint generation mode: {keypoints}')
       else:
         # Keypoints are explicitly provided in the config.
         feature_keypoints[feature_name] = [float(x) for x in keypoints]
 
     # Save keypoints to file as the chief worker.
-    tmp_keypoints_filename = keypoints_filename + 'tmp'
+    tmp_keypoints_filename = f'{keypoints_filename}tmp'
     with tf.io.gfile.GFile(tmp_keypoints_filename, 'w') as keypoints_file:
       keypoints_file.write(json.dumps(feature_keypoints, indent=2))
     tf.io.gfile.rename(tmp_keypoints_filename, keypoints_filename)
@@ -454,7 +447,7 @@ def _set_crystals_lattice_ensemble(model_config, feature_names, label_dimension,
       os.path.join(prefitting_estimator.model_dir, 'checkpoint'),
   ]
   remove_list.extend(
-      tf.io.gfile.glob(prefitting_estimator.latest_checkpoint() + '*'))
+      tf.io.gfile.glob(f'{prefitting_estimator.latest_checkpoint()}*'))
   for file_path in remove_list:
     tf.io.gfile.remove(file_path)
 
@@ -482,22 +475,20 @@ def _finalize_model_structure(model_config, label_dimension, feature_columns,
 
   if model_config.lattice_rank > len(feature_names):
     raise ValueError(
-        'lattice_rank {} cannot be larger than the number of features: {}'
-        .format(model_config.lattice_rank, feature_names))
+        f'lattice_rank {model_config.lattice_rank} cannot be larger than the number of features: {feature_names}'
+    )
 
   if model_config.num_lattices * model_config.lattice_rank < len(feature_names):
     raise ValueError(
-        'Model with {}x{}d lattices is not large enough for all features: {}'
-        .format(model_config.num_lattices, model_config.lattice_rank,
-                feature_names))
+        f'Model with {model_config.num_lattices}x{model_config.lattice_rank}d lattices is not large enough for all features: {feature_names}'
+    )
 
   ensemble_structure_filename = os.path.join(model_dir,
                                              _ENSEMBLE_STRUCTURE_FILE)
   if ((config is None or config.is_chief) and
       not tf.io.gfile.exists(ensemble_structure_filename)):
     if model_config.lattices not in ['random', 'crystals', 'rtl_layer']:
-      raise ValueError('Unsupported ensemble structure: {}'.format(
-          model_config.lattices))
+      raise ValueError(f'Unsupported ensemble structure: {model_config.lattices}')
     if model_config.lattices == 'random':
       premade_lib.set_random_lattice_ensemble(model_config, feature_names)
     elif model_config.lattices == 'crystals':
@@ -519,7 +510,7 @@ def _finalize_model_structure(model_config, label_dimension, feature_columns,
       _fix_ensemble_for_2d_constraints(model_config, feature_names)
 
     # Save lattices to file as the chief worker.
-    tmp_ensemble_structure_filename = ensemble_structure_filename + 'tmp'
+    tmp_ensemble_structure_filename = f'{ensemble_structure_filename}tmp'
     with tf.io.gfile.GFile(tmp_ensemble_structure_filename,
                            'w') as ensemble_structure_file:
       ensemble_structure_file.write(json.dumps(model_config.lattices, indent=2))
@@ -546,19 +537,19 @@ def _verify_config(model_config, feature_columns):
     feature_configs = model_config.feature_configs or []
 
   for feature_config in feature_configs:
-    if not feature_config.num_buckets:
-      if (not np.iterable(feature_config.pwl_calibration_input_keypoints) or
-          any(not isinstance(x, float)
-              for x in feature_config.pwl_calibration_input_keypoints)):
-        raise ValueError(
-            'Input keypoints are invalid for feature {}: {}'.format(
-                feature_config.name,
-                feature_config.pwl_calibration_input_keypoints))
+    if not feature_config.num_buckets and (
+        not np.iterable(feature_config.pwl_calibration_input_keypoints)
+        or any(not isinstance(x, float)
+               for x in feature_config.pwl_calibration_input_keypoints)):
+      raise ValueError(
+          f'Input keypoints are invalid for feature {feature_config.name}: {feature_config.pwl_calibration_input_keypoints}'
+      )
 
   if (not np.iterable(model_config.output_initialization) or any(
       not isinstance(x, float) for x in model_config.output_initialization)):
-    raise ValueError('Output initilization is invalid: {}'.format(
-        model_config.output_initialization))
+    raise ValueError(
+        f'Output initilization is invalid: {model_config.output_initialization}'
+    )
 
 
 def _update_by_feature_columns(model_config, feature_columns):
@@ -566,11 +557,15 @@ def _update_by_feature_columns(model_config, feature_columns):
   for feature_column in feature_columns or []:
     feature_config = model_config.feature_config_by_name(feature_column.name)
     # pylint: disable=protected-access
-    if (isinstance(feature_column, fc._DenseColumn) or
-        isinstance(feature_column, fc2.DenseColumn)):
+    if isinstance(feature_column, (fc._DenseColumn, fc2.DenseColumn)):
       feature_config.default_value = feature_column.default_value
-    elif (isinstance(feature_column, fc._VocabularyListCategoricalColumn) or
-          isinstance(feature_column, fc2.VocabularyListCategoricalColumn)):
+    elif isinstance(
+          feature_column,
+          (
+              fc._VocabularyListCategoricalColumn,
+              fc2.VocabularyListCategoricalColumn,
+          ),
+      ):
       feature_config.vocabulary_list = feature_column.vocabulary_list
       feature_config.num_buckets = feature_column.num_buckets
       if feature_column.num_oov_buckets:
@@ -583,8 +578,8 @@ def _update_by_feature_columns(model_config, feature_columns):
         feature_config.default_value = feature_column.default_value
         feature_config.num_buckets += 1
     else:
-      raise ValueError('Unsupported feature_column: {}'.format(feature_column))
-    # pylint: enable=protected-access
+      raise ValueError(f'Unsupported feature_column: {feature_column}')
+      # pylint: enable=protected-access
 
   # Change categorical monotonicities to indices.
   premade_lib.set_categorical_monotonicities(model_config.feature_configs)
@@ -1210,8 +1205,7 @@ def _match_op(ops, regex):
   matches = []
   prog = re.compile(regex)
   for op in ops:
-    op_matches = prog.findall(op)
-    if op_matches:
+    if op_matches := prog.findall(op):
       matches.append((op, op_matches[0]))
   return matches
 
@@ -1221,7 +1215,7 @@ def _create_feature_nodes(sess, ops, graph):
   # Extract list of features from the graph.
   # {FEATURES_SCOPE}/{feature_name}
   feature_nodes = {}
-  feature_op_re = r'^{}/(.*)'.format(re.escape(FEATURES_SCOPE))
+  feature_op_re = f'^{re.escape(FEATURES_SCOPE)}/(.*)'
   for (_, feature_name) in _match_op(ops, feature_op_re):
     is_categorical = False
     vocabulary_list = None
@@ -1230,13 +1224,12 @@ def _create_feature_nodes(sess, ops, graph):
     # (i.e. lookup table for categorical feature column). Note that there can be
     # at most one such mapping either under transform or transform_1 namespace.
     # transform(_\d)?/{feature_name}_lookup/Const
-    category_table_re = r'transform(_\d)?/{}_lookup/Const'.format(
-        re.escape(feature_name))
+    category_table_re = f'transform(_\d)?/{re.escape(feature_name)}_lookup/Const'
     for (category_table_op, _) in _match_op(ops, category_table_re):
       if is_categorical:
         raise ValueError(
-            'Model graph has multiple category mappings for feature {}'
-            .format(feature_name))
+            f'Model graph has multiple category mappings for feature {feature_name}'
+        )
       is_categorical = True
       vocabulary_list = sess.run(
           graph.get_operation_by_name(category_table_op).outputs[0])
@@ -1260,21 +1253,14 @@ def _create_categorical_calibration_nodes(sess, ops, graph, feature_nodes):
   # Get calibrator output values. We need to call the read variable op.
   # {CALIB_LAYER_NAME}_{feature_name}/
   #   {CATEGORICAL_CALIBRATION_KERNEL_NAME}/Read/ReadVariableOp
-  kernel_op_re = '^{}_(.*)/{}/Read/ReadVariableOp$'.format(
-      premade_lib.CALIB_LAYER_NAME,
-      categorical_calibration_layer.CATEGORICAL_CALIBRATION_KERNEL_NAME,
-  )
+  kernel_op_re = f'^{premade_lib.CALIB_LAYER_NAME}_(.*)/{categorical_calibration_layer.CATEGORICAL_CALIBRATION_KERNEL_NAME}/Read/ReadVariableOp$'
   for kernel_op, feature_name in _match_op(ops, kernel_op_re):
     output_values = sess.run(graph.get_operation_by_name(kernel_op).outputs[0])
 
     # Get default input value if defined.
     # {CALIB_LAYER_NAME}_{feature_name}/
     #   {DEFAULT_INPUT_VALUE_NAME}
-    default_input_value_op = '^{}_{}/{}$'.format(
-        premade_lib.CALIB_LAYER_NAME,
-        feature_name,
-        categorical_calibration_layer.DEFAULT_INPUT_VALUE_NAME,
-    )
+    default_input_value_op = f'^{premade_lib.CALIB_LAYER_NAME}_{feature_name}/{categorical_calibration_layer.DEFAULT_INPUT_VALUE_NAME}$'
     if default_input_value_op in ops:
       default_input = sess.run(
           graph.get_operation_by_name(default_input_value_op).outputs[0])
@@ -1302,26 +1288,15 @@ def _create_pwl_calibration_nodes(sess, ops, graph, feature_nodes):
 
   # Lengths (deltas between keypoints).
   # {CALIB_LAYER_NAME}_{feature_name}/{LENGTHS_NAME}
-  lengths_op_re = '^{}_(.*)/{}$'.format(
-      premade_lib.CALIB_LAYER_NAME,
-      pwl_calibration_layer.LENGTHS_NAME,
-  )
+  lengths_op_re = f'^{premade_lib.CALIB_LAYER_NAME}_(.*)/{pwl_calibration_layer.LENGTHS_NAME}$'
   for lengths_op, feature_name in _match_op(ops, lengths_op_re):
     # Interpolation keypoints does not inlcude the last input keypoint.
     # {CALIB_LAYER_NAME}_{feature_name}/{INTERPOLATION_KEYPOINTS_NAME}
-    keypoints_op = '{}_{}/{}'.format(
-        premade_lib.CALIB_LAYER_NAME,
-        feature_name,
-        pwl_calibration_layer.INTERPOLATION_KEYPOINTS_NAME,
-    )
+    keypoints_op = f'{premade_lib.CALIB_LAYER_NAME}_{feature_name}/{pwl_calibration_layer.INTERPOLATION_KEYPOINTS_NAME}'
 
     # Output keypoints. We need to call the varible read op.
     # {CALIB_LAYER_NAME}_{feature_name}/{PWL_CALIBRATION_KERNEL_NAME}
-    kernel_op = '{}_{}/{}/Read/ReadVariableOp'.format(
-        premade_lib.CALIB_LAYER_NAME,
-        feature_name,
-        pwl_calibration_layer.PWL_CALIBRATION_KERNEL_NAME,
-    )
+    kernel_op = f'{premade_lib.CALIB_LAYER_NAME}_{feature_name}/{pwl_calibration_layer.PWL_CALIBRATION_KERNEL_NAME}/Read/ReadVariableOp'
 
     (lengths, keypoints, kernel) = sess.run(
         (graph.get_operation_by_name(lengths_op).outputs[0],
@@ -1349,11 +1324,7 @@ def _create_pwl_calibration_nodes(sess, ops, graph, feature_nodes):
 
     # Get missing/default input value if present:
     # {CALIB_LAYER_NAME}_{feature_name}/{MISSING_INPUT_VALUE_NAME}
-    default_input_value_op = '{}_{}/{}'.format(
-        premade_lib.CALIB_LAYER_NAME,
-        feature_name,
-        pwl_calibration_layer.MISSING_INPUT_VALUE_NAME,
-    )
+    default_input_value_op = f'{premade_lib.CALIB_LAYER_NAME}_{feature_name}/{pwl_calibration_layer.MISSING_INPUT_VALUE_NAME}'
     if default_input_value_op in ops:
       default_input = sess.run(
           graph.get_operation_by_name(default_input_value_op).outputs[0])[0]
@@ -1362,11 +1333,7 @@ def _create_pwl_calibration_nodes(sess, ops, graph, feature_nodes):
 
     # Find corresponding default/missing output if present.
     # {CALIB_LAYER_NAME}_{feature_name}/{PWL_CALIBRATION_MISSING_OUTPUT_NAME}
-    default_output_op = '{}_{}/{}/Read/ReadVariableOp'.format(
-        premade_lib.CALIB_LAYER_NAME,
-        feature_name,
-        pwl_calibration_layer.PWL_CALIBRATION_MISSING_OUTPUT_NAME,
-    )
+    default_output_op = f'{premade_lib.CALIB_LAYER_NAME}_{feature_name}/{pwl_calibration_layer.PWL_CALIBRATION_MISSING_OUTPUT_NAME}/Read/ReadVariableOp'
     if default_output_op in ops:
       default_output = sess.run(
           graph.get_operation_by_name(default_output_op).outputs[0])
@@ -1393,8 +1360,7 @@ def _create_submodel_input_map(ops, calibration_nodes_map):
     # Identity passthrough ops that pass this calibration to each submodel.
     # {CALIB_PASSTHROUGH_NAME}_{feature_name}_
     #   {calibration_output_idx}_{submodel_idx}_{submodel_input_idx}
-    shared_calib_passthrough_op_re = r'^{}_{}_(\d*)_(\d*)_(\d*)$'.format(
-        premade_lib.CALIB_PASSTHROUGH_NAME, feature_name)
+    shared_calib_passthrough_op_re = f'^{premade_lib.CALIB_PASSTHROUGH_NAME}_{feature_name}_(\d*)_(\d*)_(\d*)$'
     for _, (calibration_output_idx, submodel_idx,
             submodel_input_idx) in _match_op(ops,
                                              shared_calib_passthrough_op_re):
@@ -1408,21 +1374,14 @@ def _create_linear_nodes(sess, ops, graph, submodel_input_nodes):
   linear_nodes = {}
   # Linear coefficients.
   # {LINEAR_LAYER_NAME}_{submodel_idx}/{LINEAR_LAYER_KERNEL_NAME}
-  linear_kernel_op_re = '^{}_(.*)/{}/Read/ReadVariableOp$'.format(
-      premade_lib.LINEAR_LAYER_NAME,
-      linear_layer.LINEAR_LAYER_KERNEL_NAME,
-  )
+  linear_kernel_op_re = f'^{premade_lib.LINEAR_LAYER_NAME}_(.*)/{linear_layer.LINEAR_LAYER_KERNEL_NAME}/Read/ReadVariableOp$'
   for linear_kernel_op, submodel_idx in _match_op(ops, linear_kernel_op_re):
     coefficients = sess.run(
         graph.get_operation_by_name(linear_kernel_op).outputs[0]).flatten()
 
     # Bias term.
     # {LINEAR_LAYER_NAME}_{submodel_idx}/{LINEAR_LAYER_BIAS_NAME}
-    bias_op = '{}_{}/{}/Read/ReadVariableOp'.format(
-        premade_lib.LINEAR_LAYER_NAME,
-        submodel_idx,
-        linear_layer.LINEAR_LAYER_BIAS_NAME,
-    )
+    bias_op = f'{premade_lib.LINEAR_LAYER_NAME}_{submodel_idx}/{linear_layer.LINEAR_LAYER_BIAS_NAME}/Read/ReadVariableOp'
     if bias_op in ops:
       bias = sess.run(graph.get_operation_by_name(bias_op).outputs[0])
     else:
@@ -1444,19 +1403,14 @@ def _create_lattice_nodes(sess, ops, graph, submodel_input_nodes):
   lattice_nodes = {}
   # Lattice weights.
   # {LATTICE_LAYER_NAME}_{submodel_idx}/{LATTICE_KERNEL_NAME}
-  lattice_kernel_op_re = '^{}_(.*)/{}/Read/ReadVariableOp$'.format(
-      premade_lib.LATTICE_LAYER_NAME,
-      lattice_layer.LATTICE_KERNEL_NAME,
-  )
+  lattice_kernel_op_re = f'^{premade_lib.LATTICE_LAYER_NAME}_(.*)/{lattice_layer.LATTICE_KERNEL_NAME}/Read/ReadVariableOp$'
   for lattice_kernel_op, submodel_idx in _match_op(ops, lattice_kernel_op_re):
     lattice_kernel = sess.run(
         graph.get_operation_by_name(lattice_kernel_op).outputs[0]).flatten()
 
     # Lattice sizes.
     # {Lattice_LAYER_NAME}_{submodel_idx}/{LATTICE_SIZES_NAME}
-    lattice_sizes_op_name = '{}_{}/{}'.format(premade_lib.LATTICE_LAYER_NAME,
-                                              submodel_idx,
-                                              lattice_layer.LATTICE_SIZES_NAME)
+    lattice_sizes_op_name = f'{premade_lib.LATTICE_LAYER_NAME}_{submodel_idx}/{lattice_layer.LATTICE_SIZES_NAME}'
     lattice_sizes = sess.run(
         graph.get_operation_by_name(
             lattice_sizes_op_name).outputs[0]).flatten()
@@ -1481,55 +1435,47 @@ def _create_kronecker_factored_lattice_nodes(sess, ops, graph,
   kfl_nodes = {}
   # KroneckerFactoredLattice kernel weights.
   # {KFL_LAYER_NAME}_{submodel_idx}/{KFL_KERNEL_NAME}
-  kfl_kernel_op_re = '^{}_(.*)/{}/Read/ReadVariableOp$'.format(
-      premade_lib.KFL_LAYER_NAME,
-      kfll.KFL_KERNEL_NAME,
-  )
+  kfl_kernel_op_re = f'^{premade_lib.KFL_LAYER_NAME}_(.*)/{kfll.KFL_KERNEL_NAME}/Read/ReadVariableOp$'
   for kfl_kernel_op, submodel_idx in _match_op(ops, kfl_kernel_op_re):
     kfl_kernel = sess.run(
         graph.get_operation_by_name(kfl_kernel_op).outputs[0]).flatten()
 
     # KroneckerFactoredLattice scale.
     # {KFL_LAYER_NAME}_{submodel_idx}/{KFL_SCALE_NAME}
-    kfl_scale_op_name = '{}_{}/{}/Read/ReadVariableOp'.format(
-        premade_lib.KFL_LAYER_NAME, submodel_idx, kfll.KFL_SCALE_NAME)
+    kfl_scale_op_name = f'{premade_lib.KFL_LAYER_NAME}_{submodel_idx}/{kfll.KFL_SCALE_NAME}/Read/ReadVariableOp'
     kfl_scale = sess.run(
         graph.get_operation_by_name(kfl_scale_op_name).outputs[0]).flatten()
 
     # KroneckerFactoredLattice bias.
     # {KFL_LAYER_NAME}_{submodel_idx}/{KFL_BIAS_NAME}
-    kfl_bias_op_name = '{}_{}/{}/Read/ReadVariableOp'.format(
-        premade_lib.KFL_LAYER_NAME, submodel_idx, kfll.KFL_BIAS_NAME)
+    kfl_bias_op_name = f'{premade_lib.KFL_LAYER_NAME}_{submodel_idx}/{kfll.KFL_BIAS_NAME}/Read/ReadVariableOp'
     kfl_bias = sess.run(
         graph.get_operation_by_name(kfl_bias_op_name).outputs[0]).flatten()
 
     # Lattice sizes.
     # {KFL_LAYER_NAME}_{submodel_idx}/{LATTICE_SIZES_NAME}
-    lattice_sizes_op_name = '{}_{}/{}'.format(premade_lib.KFL_LAYER_NAME,
-                                              submodel_idx,
-                                              kfll.LATTICE_SIZES_NAME)
+    lattice_sizes_op_name = f'{premade_lib.KFL_LAYER_NAME}_{submodel_idx}/{kfll.LATTICE_SIZES_NAME}'
     lattice_sizes = sess.run(
         graph.get_operation_by_name(
             lattice_sizes_op_name).outputs[0])
 
     # Units.
     # {KFL_LAYER_NAME}_{submodel_idx}/{UNITS_NAME}
-    units_op_name = '{}_{}/{}'.format(premade_lib.KFL_LAYER_NAME,
-                                      submodel_idx, kfll.UNITS_NAME)
+    units_op_name = (
+        f'{premade_lib.KFL_LAYER_NAME}_{submodel_idx}/{kfll.UNITS_NAME}')
     units = sess.run(
         graph.get_operation_by_name(units_op_name).outputs[0])
 
     # Dims.
     # {KFL_LAYER_NAME}_{submodel_idx}/{DIMS_NAME}
-    dims_op_name = '{}_{}/{}'.format(premade_lib.KFL_LAYER_NAME,
-                                     submodel_idx, kfll.DIMS_NAME)
+    dims_op_name = f'{premade_lib.KFL_LAYER_NAME}_{submodel_idx}/{kfll.DIMS_NAME}'
     dims = sess.run(
         graph.get_operation_by_name(dims_op_name).outputs[0])
 
     # Num terms.
     # {KFL_LAYER_NAME}_{submodel_idx}/{NUM_TERMS_NAME}
-    num_terms_op_name = '{}_{}/{}'.format(premade_lib.KFL_LAYER_NAME,
-                                          submodel_idx, kfll.NUM_TERMS_NAME)
+    num_terms_op_name = (
+        f'{premade_lib.KFL_LAYER_NAME}_{submodel_idx}/{kfll.NUM_TERMS_NAME}')
     num_terms = sess.run(
         graph.get_operation_by_name(num_terms_op_name).outputs[0])
 
@@ -1558,12 +1504,7 @@ def _create_rtl_submodel_kronecker_factored_lattice_nodes(
   # KroneckerFactoredLattice kernel weights
   # {RTL_LAYER_NAME}_{submodel_idx}/
   # {RTL_KFL_NAME}_{monotonicities}/{KFL_KERNEL_NAME}
-  kfl_kernel_op_re = '^{}_{}/{}_(.*)/{}/Read/ReadVariableOp$'.format(
-      premade_lib.RTL_LAYER_NAME,
-      submodel_idx,
-      rtl_layer.RTL_KFL_NAME,
-      kfll.KFL_KERNEL_NAME,
-  )
+  kfl_kernel_op_re = f'^{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.RTL_KFL_NAME}_(.*)/{kfll.KFL_KERNEL_NAME}/Read/ReadVariableOp$'
   for kfl_kernel_op, monotonicities in _match_op(ops, kfl_kernel_op_re):
     kfl_kernel = sess.run(
         graph.get_operation_by_name(kfl_kernel_op).outputs[0]).flatten()
@@ -1571,73 +1512,41 @@ def _create_rtl_submodel_kronecker_factored_lattice_nodes(
     # KroneckerFactoredLattice scale.
     # {RTL_LAYER_NAME}_{submodel_idx}/
     # {RTL_KFL_NAME}_{monotonicities}/{KFL_SCALE_NAME}
-    kfl_scale_op_name = '{}_{}/{}_{}/{}/Read/ReadVariableOp'.format(
-        premade_lib.RTL_LAYER_NAME,
-        submodel_idx,
-        rtl_layer.RTL_KFL_NAME,
-        monotonicities,
-        kfll.KFL_SCALE_NAME,
-    )
+    kfl_scale_op_name = f'{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.RTL_KFL_NAME}_{monotonicities}/{kfll.KFL_SCALE_NAME}/Read/ReadVariableOp'
     kfl_scale = sess.run(
         graph.get_operation_by_name(kfl_scale_op_name).outputs[0]).flatten()
 
     # KroneckerFactoredLattice bias.
     # {RTL_LAYER_NAME}_{submodel_idx}/
     # {RTL_KFL_NAME}_{monotonicities}/{KFL_BIAS_NAME}
-    kfl_bias_op_name = '{}_{}/{}_{}/{}/Read/ReadVariableOp'.format(
-        premade_lib.RTL_LAYER_NAME,
-        submodel_idx,
-        rtl_layer.RTL_KFL_NAME,
-        monotonicities,
-        kfll.KFL_BIAS_NAME,
-    )
+    kfl_bias_op_name = f'{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.RTL_KFL_NAME}_{monotonicities}/{kfll.KFL_BIAS_NAME}/Read/ReadVariableOp'
     kfl_bias = sess.run(
         graph.get_operation_by_name(kfl_bias_op_name).outputs[0]).flatten()
 
     # Lattice sizes.
     # {RTL_LAYER_NAME}_{submodel_idx}/
     # {RTL_KFL_NAME}_{monotonicities}/{LATTICE_SIZES_NAME}
-    lattice_sizes_op_name = '{}_{}/{}_{}/{}'.format(
-        premade_lib.RTL_LAYER_NAME,
-        submodel_idx,
-        rtl_layer.RTL_KFL_NAME,
-        monotonicities,
-        kfll.LATTICE_SIZES_NAME,
-    )
+    lattice_sizes_op_name = f'{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.RTL_KFL_NAME}_{monotonicities}/{kfll.LATTICE_SIZES_NAME}'
     lattice_sizes = sess.run(
         graph.get_operation_by_name(lattice_sizes_op_name).outputs[0])
 
     # Dims.
     # {RTL_LAYER_NAME}_{submodel_idx}/
     # {RTL_KFL_NAME}_{monotonicities}/{DIMS_NAME}
-    dims_op_name = '{}_{}/{}_{}/{}'.format(
-        premade_lib.RTL_LAYER_NAME,
-        submodel_idx,
-        rtl_layer.RTL_KFL_NAME,
-        monotonicities,
-        kfll.DIMS_NAME,
-    )
+    dims_op_name = f'{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.RTL_KFL_NAME}_{monotonicities}/{kfll.DIMS_NAME}'
     dims = sess.run(graph.get_operation_by_name(dims_op_name).outputs[0])
 
     # Num terms.
     # {RTL_LAYER_NAME}_{submodel_idx}/
     # {RTL_KFL_NAME}_{monotonicities}/{NUM_TERMS_NAME}
-    num_terms_op_name = '{}_{}/{}_{}/{}'.format(
-        premade_lib.RTL_LAYER_NAME,
-        submodel_idx,
-        rtl_layer.RTL_KFL_NAME,
-        monotonicities,
-        kfll.NUM_TERMS_NAME,
-    )
+    num_terms_op_name = f'{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.RTL_KFL_NAME}_{monotonicities}/{kfll.NUM_TERMS_NAME}'
     num_terms = sess.run(
         graph.get_operation_by_name(num_terms_op_name).outputs[0])
 
     # inputs_for_units
     # {RTL_LAYER_NAME}_{submodel_index}/
     # {INPUTS_FOR_UNITS_PREFIX}_{monotonicities}
-    inputs_for_units_op_name = '{}_{}/{}_{}'.format(
-        premade_lib.RTL_LAYER_NAME, submodel_idx,
-        rtl_layer.INPUTS_FOR_UNITS_PREFIX, monotonicities)
+    inputs_for_units_op_name = f'{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.INPUTS_FOR_UNITS_PREFIX}_{monotonicities}'
     inputs_for_units = sess.run(
         graph.get_operation_by_name(inputs_for_units_op_name).outputs[0])
 
@@ -1670,12 +1579,7 @@ def _create_rtl_submodel_lattice_nodes(sess, ops, graph,
   # Lattice kernel weights.
   # {RTL_LAYER_NAME}_{submodel_idx}/
   # {RTL_LATTICE_NAME}_{monotonicities}/{LATTICE_KERNEL_NAME}
-  lattice_kernel_op_re = '^{}_{}/{}_(.*)/{}/Read/ReadVariableOp$'.format(
-      premade_lib.RTL_LAYER_NAME,
-      submodel_idx,
-      rtl_layer.RTL_LATTICE_NAME,
-      lattice_layer.LATTICE_KERNEL_NAME,
-  )
+  lattice_kernel_op_re = f'^{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.RTL_LATTICE_NAME}_(.*)/{lattice_layer.LATTICE_KERNEL_NAME}/Read/ReadVariableOp$'
   for lattice_kernel_op, monotonicities in _match_op(ops, lattice_kernel_op_re):
     lattice_kernel = sess.run(
         graph.get_operation_by_name(lattice_kernel_op).outputs[0])
@@ -1683,9 +1587,7 @@ def _create_rtl_submodel_lattice_nodes(sess, ops, graph,
     # Lattice sizes.
     # {RTL_LAYER_NAME}_{submodel_idx}/
     # {RTL_LATTICE_NAME}_{monotonicities}/{LATTICE_SIZES_NAME}
-    lattice_sizes_op_name = '{}_{}/{}_{}/{}'.format(
-        premade_lib.RTL_LAYER_NAME, submodel_idx, rtl_layer.RTL_LATTICE_NAME,
-        monotonicities, lattice_layer.LATTICE_SIZES_NAME)
+    lattice_sizes_op_name = f'{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.RTL_LATTICE_NAME}_{monotonicities}/{lattice_layer.LATTICE_SIZES_NAME}'
     lattice_sizes = sess.run(
         graph.get_operation_by_name(
             lattice_sizes_op_name).outputs[0]).flatten()
@@ -1693,9 +1595,7 @@ def _create_rtl_submodel_lattice_nodes(sess, ops, graph,
     # inputs_for_units
     # {RTL_LAYER_NAME}_{submodel_index}/
     # {INPUTS_FOR_UNITS_PREFIX}_{monotonicities}
-    inputs_for_units_op_name = '{}_{}/{}_{}'.format(
-        premade_lib.RTL_LAYER_NAME, submodel_idx,
-        rtl_layer.INPUTS_FOR_UNITS_PREFIX, monotonicities)
+    inputs_for_units_op_name = f'{premade_lib.RTL_LAYER_NAME}_{submodel_idx}/{rtl_layer.INPUTS_FOR_UNITS_PREFIX}_{monotonicities}'
     inputs_for_units = sess.run(
         graph.get_operation_by_name(inputs_for_units_op_name).outputs[0])
 
@@ -1724,21 +1624,19 @@ def _create_rtl_lattice_nodes(sess, ops, graph, calibration_nodes_map,
   lattice_submodel_index = 0
   # Feature name in concat op.
   # {RTL_INPUT_NAME}_{feature_name}:0
-  feature_name_prog = re.compile('^{}_(.*):0$'.format(
-      premade_lib.RTL_INPUT_NAME))
+  feature_name_prog = re.compile(f'^{premade_lib.RTL_INPUT_NAME}_(.*):0$')
   # RTL Layer identified by single concat op per submodel.
   # {RTL_LAYER_NAME}_{submodel_idx}/RTL_CONCAT_NAME
-  rtl_layer_concat_op_re = '^{}_(.*)/{}$'.format(premade_lib.RTL_LAYER_NAME,
-                                                 rtl_layer.RTL_CONCAT_NAME)
+  rtl_layer_concat_op_re = (
+      f'^{premade_lib.RTL_LAYER_NAME}_(.*)/{rtl_layer.RTL_CONCAT_NAME}$')
   for concat_op_name, submodel_idx in _match_op(ops, rtl_layer_concat_op_re):
     # First we reconstruct the flattened calibration outputs for this submodel.
     concat_op = graph.get_operation_by_name(concat_op_name)
     input_names = [input_tensor.name for input_tensor in concat_op.inputs]
     names_in_flattened_order = []
     for input_name in input_names:
-      match = feature_name_prog.match(input_name)
-      if match:
-        names_in_flattened_order.append(match.group(1))
+      if match := feature_name_prog.match(input_name):
+        names_in_flattened_order.append(match[1])
     flattened_calibration_nodes = []
     for feature_name in names_in_flattened_order:
       flattened_calibration_nodes.extend(calibration_nodes_map[feature_name])
@@ -1750,7 +1648,7 @@ def _create_rtl_lattice_nodes(sess, ops, graph, calibration_nodes_map,
     lattice_submodel_index, submodel_lattice_nodes = node_fn(
         sess, ops, graph, flattened_calibration_nodes, submodel_idx,
         lattice_submodel_index)
-    lattice_nodes.update(submodel_lattice_nodes)
+    lattice_nodes |= submodel_lattice_nodes
   return lattice_nodes
 
 
@@ -1766,10 +1664,7 @@ def _create_output_combination_node(sess, ops, graph, submodel_output_nodes):
 
     # Linear coefficients.
     # {LINEAR_LAYER_COMBINATION_NAME}/{LINEAR_LAYER_KERNEL_NAME}
-    linear_combination_kernel_op = '{}/{}/Read/ReadVariableOp'.format(
-        premade_lib.OUTPUT_LINEAR_COMBINATION_LAYER_NAME,
-        linear_layer.LINEAR_LAYER_KERNEL_NAME,
-    )
+    linear_combination_kernel_op = f'{premade_lib.OUTPUT_LINEAR_COMBINATION_LAYER_NAME}/{linear_layer.LINEAR_LAYER_KERNEL_NAME}/Read/ReadVariableOp'
     if linear_combination_kernel_op in ops:
       coefficients = sess.run(
           graph.get_operation_by_name(
@@ -1777,10 +1672,7 @@ def _create_output_combination_node(sess, ops, graph, submodel_output_nodes):
 
       # Bias term.
       # {OUTPUT_LINEAR_COMBINATION_LAYER_NAME}/{LINEAR_LAYER_BIAS_NAME}
-      bias_op = '{}/{}/Read/ReadVariableOp'.format(
-          premade_lib.OUTPUT_LINEAR_COMBINATION_LAYER_NAME,
-          linear_layer.LINEAR_LAYER_BIAS_NAME,
-      )
+      bias_op = f'{premade_lib.OUTPUT_LINEAR_COMBINATION_LAYER_NAME}/{linear_layer.LINEAR_LAYER_BIAS_NAME}/Read/ReadVariableOp'
       if bias_op in ops:
         bias = sess.run(graph.get_operation_by_name(bias_op).outputs[0])
       else:
@@ -1800,24 +1692,15 @@ def _create_output_calibration_node(sess, ops, graph, input_node):
   output_calibration_node = None
   # Lengths (deltas between keypoints).
   # {OUTPUT_CALIB_LAYER_NAME}/{LENGTHS_NAME}
-  lengths_op = '{}/{}'.format(
-      premade_lib.OUTPUT_CALIB_LAYER_NAME,
-      pwl_calibration_layer.LENGTHS_NAME,
-  )
+  lengths_op = f'{premade_lib.OUTPUT_CALIB_LAYER_NAME}/{pwl_calibration_layer.LENGTHS_NAME}'
   if lengths_op in ops:
     # Interpolation keypoints does not inlcude the last input keypoint.
     # {OUTPUT_CALIB_LAYER_NAME}/{INTERPOLATION_KEYPOINTS_NAME}
-    keypoints_op = '{}/{}'.format(
-        premade_lib.OUTPUT_CALIB_LAYER_NAME,
-        pwl_calibration_layer.INTERPOLATION_KEYPOINTS_NAME,
-    )
+    keypoints_op = f'{premade_lib.OUTPUT_CALIB_LAYER_NAME}/{pwl_calibration_layer.INTERPOLATION_KEYPOINTS_NAME}'
 
     # Output keypoints. We need to call the varible read op.
     # {OUTPUT_CALIB_LAYER_NAME}/{PWL_CALIBRATION_KERNEL_NAME}
-    kernel_op = '{}/{}/Read/ReadVariableOp'.format(
-        premade_lib.OUTPUT_CALIB_LAYER_NAME,
-        pwl_calibration_layer.PWL_CALIBRATION_KERNEL_NAME,
-    )
+    kernel_op = f'{premade_lib.OUTPUT_CALIB_LAYER_NAME}/{pwl_calibration_layer.PWL_CALIBRATION_KERNEL_NAME}/Read/ReadVariableOp'
 
     (lengths, keypoints, kernel) = sess.run(
         (graph.get_operation_by_name(lengths_op).outputs[0],
@@ -1892,7 +1775,7 @@ def get_model_graph(saved_model_path, tag='serve'):
 
     # Dict from feature name to list of calibration nodes (Categorical and PWL).
     calibration_nodes_map = {}
-    calibration_nodes_map.update(categorical_calibration_nodes)
+    calibration_nodes_map |= categorical_calibration_nodes
     calibration_nodes_map.update(pwl_calibration_nodes)
     # Dict from submodel index to a list of calibrated inputs for the submodel.
     submodel_input_nodes = _create_submodel_input_map(ops,
@@ -1900,7 +1783,7 @@ def get_model_graph(saved_model_path, tag='serve'):
 
     # Linear nodes
     linear_nodes = _create_linear_nodes(sess, ops, graph, submodel_input_nodes)
-    submodel_output_nodes.update(linear_nodes)
+    submodel_output_nodes |= linear_nodes
     nodes.extend(linear_nodes.values())
 
     # Ensemble Lattice nodes.
@@ -1935,10 +1818,8 @@ def get_model_graph(saved_model_path, tag='serve'):
     else:
       model_output_node = list(submodel_output_nodes.values())[0]
 
-    # Output calibration node.
-    output_calibration_node = _create_output_calibration_node(
-        sess, ops, graph, model_output_node)
-    if output_calibration_node:
+    if output_calibration_node := _create_output_calibration_node(
+        sess, ops, graph, model_output_node):
       nodes.append(output_calibration_node)
       model_output_node = output_calibration_node
 

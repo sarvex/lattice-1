@@ -304,19 +304,18 @@ class RTL(keras.layers.Layer):
       monotonicities_str = ''.join(
           [str(monotonicity) for monotonicity in monotonicities])
       # Passthrough names for reconstructing model graph.
-      inputs_for_units_name = '{}_{}'.format(INPUTS_FOR_UNITS_PREFIX,
-                                             monotonicities_str)
+      inputs_for_units_name = f'{INPUTS_FOR_UNITS_PREFIX}_{monotonicities_str}'
       # Use control dependencies to save inputs_for_units as graph constant for
       # visualisation toolbox to be able to recover it from saved graph.
       # Wrap this constant into pure op since in TF 2.0 there are issues passing
       # tensors into control_dependencies.
       with tf.control_dependencies([
-          tf.constant(
-              inputs_for_units, dtype=tf.int32, name=inputs_for_units_name)
-      ]):
+              tf.constant(
+                  inputs_for_units, dtype=tf.int32, name=inputs_for_units_name)
+          ]):
         units = len(inputs_for_units)
         if self.parameterization == 'all_vertices':
-          layer_name = '{}_{}'.format(RTL_LATTICE_NAME, monotonicities_str)
+          layer_name = f'{RTL_LATTICE_NAME}_{monotonicities_str}'
           lattice_sizes = [self.lattice_size] * self.lattice_rank
           kernel_initializer = lattice_layer.create_kernel_initializer(
               kernel_initializer_id=self.kernel_initializer,
@@ -343,7 +342,7 @@ class RTL(keras.layers.Layer):
               name=layer_name,
           )
         elif self.parameterization == 'kronecker_factored':
-          layer_name = '{}_{}'.format(RTL_KFL_NAME, monotonicities_str)
+          layer_name = f'{RTL_KFL_NAME}_{monotonicities_str}'
           kernel_initializer = kfll.create_kernel_initializer(
               kernel_initializer_id=self.kernel_initializer,
               monotonicities=monotonicities,
@@ -364,8 +363,7 @@ class RTL(keras.layers.Layer):
                   scale_initializer='scale_initializer',
                   name=layer_name)
         else:
-          raise ValueError('Unknown type of parameterization: {}'.format(
-              self.parameterization))
+          raise ValueError(f'Unknown type of parameterization: {self.parameterization}')
     super(RTL, self).build(input_shape)
 
   def call(self, x, **kwargs):
@@ -480,8 +478,10 @@ class RTL(keras.layers.Layer):
       them. In graph mode returns a list of `assign_add` op which has to be
       executed to updates weights.
     """
-    return list(lattice_layer.finalize_constraints()
-                for lattice_layer in self._lattice_layers.values())
+    return [
+        lattice_layer.finalize_constraints()
+        for lattice_layer in self._lattice_layers.values()
+    ]
 
   def assert_constraints(self, eps=1e-6):
     """Asserts that weights satisfy all constraints.
@@ -533,8 +533,7 @@ class RTL(keras.layers.Layer):
         monotonicity = 1
       else:
         raise ValueError(
-            'Unrecognized key in the input to the RTL layer: {}'.format(
-                input_key))
+            f'Unrecognized key in the input to the RTL layer: {input_key}')
 
       if not isinstance(shapes, list):
         # Get the shape after a split. See single dense tensor input format in
@@ -554,24 +553,21 @@ class RTL(keras.layers.Layer):
     total_usage = self.num_lattices * self.lattice_rank
     if total_usage < len(rtl_inputs):
       raise ValueError(
-          'RTL layer with {}x{}D lattices is too small to use all the {} input '
-          'features'.format(self.num_lattices, self.lattice_rank,
-                            len(rtl_inputs)))
+          f'RTL layer with {self.num_lattices}x{self.lattice_rank}D lattices is too small to use all the {len(rtl_inputs)} input features'
+      )
 
     # Repeat the features to fill all the slots in the RTL layer.
     rs = np.random.RandomState(self.random_seed)
     rs.shuffle(rtl_inputs)
-    rtl_inputs = rtl_inputs * (1 + total_usage // len(rtl_inputs))
+    rtl_inputs *= 1 + total_usage // len(rtl_inputs)
     rtl_inputs = rtl_inputs[:total_usage]
     rs.shuffle(rtl_inputs)
 
-    # Start with random lattices, possibly with repeated groups in lattices.
-    lattices = []
-    for lattice_index in range(self.num_lattices):
-      lattices.append(
-          rtl_inputs[lattice_index * self.lattice_rank:(lattice_index + 1) *
-                     self.lattice_rank])
-
+    lattices = [
+        rtl_inputs[lattice_index * self.lattice_rank:(lattice_index + 1) *
+                   self.lattice_rank]
+        for lattice_index in range(self.num_lattices)
+    ]
     # Swap features between lattices to make sure only a single input from each
     # group is used in each lattice.
     changed = True
@@ -596,10 +592,12 @@ class RTL(keras.layers.Layer):
             continue
 
           # Swap if a group is repeated and a swap fixes it.
-          rest_lattice_groups_0 = list(
-              lattice_input.group for lattice_input in rest_lattice_0)
-          rest_lattice_groups_1 = list(
-              lattice_input.group for lattice_input in rest_lattice_1)
+          rest_lattice_groups_0 = [
+              lattice_input.group for lattice_input in rest_lattice_0
+          ]
+          rest_lattice_groups_1 = [
+              lattice_input.group for lattice_input in rest_lattice_1
+          ]
           if ((feature_0.group in rest_lattice_groups_0) and
               (feature_0.group not in rest_lattice_groups_1) and
               (feature_1.group not in rest_lattice_groups_0)):
@@ -615,8 +613,9 @@ class RTL(keras.layers.Layer):
       lattice.sort(key=lambda lattice_input: lattice_input.monotonicity)
       monotonicities = tuple(
           lattice_input.monotonicity for lattice_input in lattice)
-      lattice_input_indices = list(
-          lattice_input.input_index for lattice_input in lattice)
+      lattice_input_indices = [
+          lattice_input.input_index for lattice_input in lattice
+      ]
       lattices_for_monotonicities[monotonicities].append(lattice_input_indices)
 
     return sorted(lattices_for_monotonicities.items())

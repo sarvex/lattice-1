@@ -97,7 +97,7 @@ class CalibratedLatticeEnsemble(tf.keras.Model):
       raise ValueError('Must provide a model_config.')
     # Check that proper config has been given.
     if not isinstance(model_config, configs.CalibratedLatticeEnsembleConfig):
-      raise ValueError('Invalid config type: {}'.format(type(model_config)))
+      raise ValueError(f'Invalid config type: {type(model_config)}')
     # Verify that the config is fully specified.
     premade_lib.verify_config(model_config)
     # Get feature configs and construct model.
@@ -202,7 +202,7 @@ class CalibratedLattice(tf.keras.Model):
       raise ValueError('Must provide a model_config.')
     # Check that proper config has been given.
     if not isinstance(model_config, configs.CalibratedLatticeConfig):
-      raise ValueError('Invalid config type: {}'.format(type(model_config)))
+      raise ValueError(f'Invalid config type: {type(model_config)}')
     # Verify that the config is fully specified.
     premade_lib.verify_config(model_config)
     # Get feature configs and construct model.
@@ -316,7 +316,7 @@ class CalibratedLinear(tf.keras.Model):
       raise ValueError('Must provide a model_config.')
     # Check that proper config has been given.
     if not isinstance(model_config, configs.CalibratedLinearConfig):
-      raise ValueError('Invalid config type: {}'.format(type(model_config)))
+      raise ValueError(f'Invalid config type: {type(model_config)}')
     # Verify that the config is fully specified.
     premade_lib.verify_config(model_config)
     # Get feature configs and construct model.
@@ -433,7 +433,7 @@ class AggregateFunction(tf.keras.Model):
       raise ValueError('Must provide a model_config.')
     # Check that proper config has been given.
     if not isinstance(model_config, configs.AggregateFunctionConfig):
-      raise ValueError('Invalid config type: {}'.format(type(model_config)))
+      raise ValueError(f'Invalid config type: {type(model_config)}')
     # Verify that the config is fully specified.
     premade_lib.verify_config(model_config)
     # Get feature configs and construct model.
@@ -593,5 +593,5 @@ def get_custom_objects(custom_objects=None):
           configs.TrustConfig,
   }
   if custom_objects is not None:
-    tfl_custom_objects.update(custom_objects)
+    tfl_custom_objects |= custom_objects
   return tfl_custom_objects

@@ -310,8 +310,7 @@ class PWLCalibration(snt.Module):
               (str(is_missing.shape), str(inputs.shape)))
       else:
         [inputs] = inputs
-    if len(inputs.shape) != 2 or (inputs.shape[1] != self.units and
-                                  inputs.shape[1] != 1):
+    if len(inputs.shape) != 2 or inputs.shape[1] not in [self.units, 1]:
       raise ValueError("Shape of input tensor for PWLCalibration module must"
                        " be [-1, units] or [-1, 1]. It is: " +
                        str(inputs.shape))

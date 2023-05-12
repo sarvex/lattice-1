@@ -122,8 +122,7 @@ class PwlCalibrationLayerTest(parameterized.TestCase, tf.test.TestCase):
 
     def Pwl(x):
       result = pwl_weights[0]
-      for begin, end, weight in zip(input_keypoints[0:-1], input_keypoints[1:],
-                                    pwl_weights[1:]):
+      for begin, end, weight in zip(input_keypoints[:-1], input_keypoints[1:], pwl_weights[1:]):
         result += weight * np.maximum(
             np.minimum((x - begin) / (end - begin), 1.0), 0.0)
       return np.mean(result, keepdims=True)
@@ -211,27 +210,27 @@ class PwlCalibrationLayerTest(parameterized.TestCase, tf.test.TestCase):
 
     model = keras.models.Sequential()
     model.add(tf.keras.layers.Input(shape=[input_units], dtype=tf.float32))
-    calibration_layers = []
-    for _ in range(num_calibration_layers):
-      calibration_layers.append(
-          keras_layer.PWLCalibration(
-              units=pwl_calibration_units,
-              dtype=tf.float32,
-              input_keypoints=config["input_keypoints"],
-              output_min=config["output_min"],
-              output_max=config["output_max"],
-              clamp_min=config["clamp_min"],
-              clamp_max=config["clamp_max"],
-              monotonicity=config["monotonicity"],
-              convexity=config["convexity"],
-              is_cyclic=config["is_cyclic"],
-              kernel_initializer=config["initializer"],
-              kernel_regularizer=config["kernel_regularizer"],
-              impute_missing=config["impute_missing"],
-              missing_output_value=config["missing_output_value"],
-              missing_input_value=config["missing_input_value"],
-              num_projection_iterations=config["num_projection_iterations"],
-              input_keypoints_type=config["input_keypoints_type"]))
+    calibration_layers = [
+        keras_layer.PWLCalibration(
+            units=pwl_calibration_units,
+            dtype=tf.float32,
+            input_keypoints=config["input_keypoints"],
+            output_min=config["output_min"],
+            output_max=config["output_max"],
+            clamp_min=config["clamp_min"],
+            clamp_max=config["clamp_max"],
+            monotonicity=config["monotonicity"],
+            convexity=config["convexity"],
+            is_cyclic=config["is_cyclic"],
+            kernel_initializer=config["initializer"],
+            kernel_regularizer=config["kernel_regularizer"],
+            impute_missing=config["impute_missing"],
+            missing_output_value=config["missing_output_value"],
+            missing_input_value=config["missing_input_value"],
+            num_projection_iterations=config["num_projection_iterations"],
+            input_keypoints_type=config["input_keypoints_type"],
+        ) for _ in range(num_calibration_layers)
+    ]
     if len(calibration_layers) == 1:
       if config["use_separate_missing"]:
         model.add(
@@ -289,8 +288,7 @@ class PwlCalibrationLayerTest(parameterized.TestCase, tf.test.TestCase):
         config["monotonicity"])
     inversed_config["convexity"] = -utils.canonicalize_convexity(
         config["convexity"])
-    inversed_loss = self._TrainModel(inversed_config)
-    return inversed_loss
+    return self._TrainModel(inversed_config)
 
   def _CreateTrainingData(self, config):
     training_inputs = config["x_generator"](
@@ -606,8 +604,6 @@ class PwlCalibrationLayerTest(parameterized.TestCase, tf.test.TestCase):
     config = {
         "units": units,
         "num_training_records": 100,
-        "num_training_epoch": 2100,
-        "optimizer": tf.keras.optimizers.SGD,
         "learning_rate": 0.015,
         "x_generator": self._ScatterXUniformly,
         "y_function": self._SmallWaves,
@@ -615,15 +611,13 @@ class PwlCalibrationLayerTest(parameterized.TestCase, tf.test.TestCase):
         "num_keypoints": 21,
         "input_min": -1.0,
         "input_max": 1.0,
-        "output_min": -1.5,
-        "output_max": 1.5,
         "clamp_min": False,
         "clamp_max": False,
+        "output_min": output_min,
+        "output_max": output_max,
+        "optimizer": optimizer,
+        "num_training_epoch": num_training_epoch,
     }
-    config["output_min"] = output_min
-    config["output_max"] = output_max
-    config["optimizer"] = optimizer
-    config["num_training_epoch"] = num_training_epoch
     loss = self._TrainModel(config)
     self.assertAlmostEqual(loss, expected_loss, delta=self._loss_eps)
     if units > 1:
@@ -637,7 +631,6 @@ class PwlCalibrationLayerTest(parameterized.TestCase, tf.test.TestCase):
       (3, -1.5, 0.122801),
       (3, 1.5, 0.106150),
   )
-  # Since function is symmetric result should be same for both values above.
   def testBoundsForMissing(self, units, missing_input_value, expected_loss):
     if self._disable_all:
       return
@@ -659,8 +652,8 @@ class PwlCalibrationLayerTest(parameterized.TestCase, tf.test.TestCase):
         "clamp_max": True,
         "impute_missing": True,
         "missing_probability": 0.1,
+        "missing_input_value": missing_input_value,
     }
-    config["missing_input_value"] = missing_input_value
     loss = self._TrainModel(config)
     self.assertAlmostEqual(loss, expected_loss, delta=self._loss_eps)
     if units > 1:
@@ -720,9 +713,9 @@ class PwlCalibrationLayerTest(parameterized.TestCase, tf.test.TestCase):
         "input_max": 0.8,
         "clamp_min": False,
         "clamp_max": False,
+        "output_min": output_min,
+        "output_max": output_max,
     }
-    config["output_min"] = output_min
-    config["output_max"] = output_max
     loss = self._TrainModel(config)
     self.assertAlmostEqual(loss, expected_loss, delta=self._loss_eps)
     if units > 1:

@@ -44,21 +44,19 @@ def _topological_sort(key_less_than_values):
 
   q = [k for k in key_less_than_values if k not in all_values]
   if not q:
-    raise ValueError(
-        "Circular monotonicity constraints: {}".format(key_less_than_values))
+    raise ValueError(f"Circular monotonicity constraints: {key_less_than_values}")
 
   result = []
   seen = set()
   while q:
     v = q[-1]
     seen.add(v)
-    expand = [x for x in key_less_than_values[v] if x not in seen]
-    if not expand:
-      result = [v] + result
-      q.pop()
-    else:
+    if expand := [x for x in key_less_than_values[v] if x not in seen]:
       q.append(expand[0])
 
+    else:
+      result = [v] + result
+      q.pop()
   return result
 
 

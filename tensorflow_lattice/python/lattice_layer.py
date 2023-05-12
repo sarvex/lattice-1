@@ -348,8 +348,7 @@ class Lattice(keras.layers.Layer):
                 LaplacianRegularizer(
                     lattice_sizes=self.lattice_sizes, l1=l1, l2=l2))
           else:
-            raise ValueError("Unknown custom lattice regularizer: %s" %
-                             regularizer)
+            raise ValueError(f"Unknown custom lattice regularizer: {regularizer}")
         else:
           # This is needed for Keras deserialization logic to be aware of our
           # custom objects.
@@ -453,17 +452,13 @@ class Lattice(keras.layers.Layer):
             lattice_sizes=self.lattice_sizes,
             clip_inputs=self.clip_inputs)
       else:
-        raise ValueError("Unknown interpolation type: %s" % self.interpolation)
+        raise ValueError(f"Unknown interpolation type: {self.interpolation}")
 
   def compute_output_shape(self, input_shape):
     """Standard Keras compute_output_shape() method."""
     if isinstance(input_shape, list):
       input_shape = input_shape[0]
-    if self.units == 1:
-      return tuple(input_shape[:-1]) + (1,)
-    else:
-      # Second to last dimension must be equal to 'units'. Nothing to append.
-      return input_shape[:-1]
+    return tuple(input_shape[:-1]) + (1,) if self.units == 1 else input_shape[:-1]
 
   def get_config(self):
     """Standard Keras config for serialization."""
@@ -489,7 +484,7 @@ class Lattice(keras.layers.Layer):
         "kernel_regularizer":
             [keras.regularizers.serialize(r) for r in self.kernel_regularizer],
     }  # pyformat: disable
-    config.update(super(Lattice, self).get_config())
+    config |= super(Lattice, self).get_config()
     return config
 
   def finalize_constraints(self):
@@ -717,14 +712,13 @@ class LinearInitializer(keras.initializers.Initializer):
 
   def get_config(self):
     """Standard Keras config for serialization."""
-    config = {
+    return {
         "lattice_sizes": self.lattice_sizes,
         "monotonicities": self.monotonicities,
         "output_min": self.output_min,
         "output_max": self.output_max,
         "unimodalities": self.unimodalities,
-    }  # pyformat: disable
-    return config
+    }
 
 
 class RandomMonotonicInitializer(keras.initializers.Initializer):
@@ -783,13 +777,12 @@ class RandomMonotonicInitializer(keras.initializers.Initializer):
 
   def get_config(self):
     """Standard Keras config for serialization."""
-    config = {
+    return {
         "lattice_sizes": self.lattice_sizes,
         "output_min": self.output_min,
         "output_max": self.output_max,
         "unimodalities": self.unimodalities,
-    }  # pyformat: disable
-    return config
+    }
 
 
 class LatticeConstraints(keras.constraints.Constraint):

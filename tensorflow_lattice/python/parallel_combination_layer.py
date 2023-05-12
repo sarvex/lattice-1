@@ -115,12 +115,11 @@ class ParallelCombination(keras.layers.Layer):
         raise ValueError("Number of ParallelCombination input tensors does not "
                          "match number of calibration layers. input_shape: %s, "
                          "layers: %s" % (input_shape, self.calibration_layers))
-    else:
-      if input_shape[1] != len(self.calibration_layers):
-        raise ValueError("Second dimension of ParallelCombination input tensor "
-                         "does not match number of calibration layers. "
-                         "input_shape: %s, layers: %s" %
-                         (input_shape, self.calibration_layers))
+    elif input_shape[1] != len(self.calibration_layers):
+      raise ValueError("Second dimension of ParallelCombination input tensor "
+                       "does not match number of calibration layers. "
+                       "input_shape: %s, layers: %s" %
+                       (input_shape, self.calibration_layers))
     super(ParallelCombination, self).build(input_shape)
 
   def call(self, inputs):
@@ -138,10 +137,7 @@ class ParallelCombination(keras.layers.Layer):
         layer(one_d_input)
         for layer, one_d_input in zip(self.calibration_layers, inputs)
     ]
-    if self.single_output:
-      return tf.concat(outputs, axis=1)
-    else:
-      return outputs
+    return tf.concat(outputs, axis=1) if self.single_output else outputs
 
   def compute_output_shape(self, input_shape):
     if self.single_output:
@@ -156,5 +152,5 @@ class ParallelCombination(keras.layers.Layer):
                                for layer in self.calibration_layers],
         "single_output": self.single_output,
     }  # pyformat: disable
-    config.update(super(ParallelCombination, self).get_config())
+    config |= super(ParallelCombination, self).get_config()
     return config

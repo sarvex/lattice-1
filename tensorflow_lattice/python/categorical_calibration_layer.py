@@ -155,8 +155,8 @@ class CategoricalCalibration(keras.layers.Layer):
     if kernel_regularizer:
       if callable(kernel_regularizer):
         kernel_regularizer = [kernel_regularizer]
-      for reg in kernel_regularizer:
-        self.kernel_regularizer.append(keras.regularizers.get(reg))
+      self.kernel_regularizer.extend(
+          keras.regularizers.get(reg) for reg in kernel_regularizer)
     self.default_input_value = default_input_value
     self.split_outputs = split_outputs
 
@@ -255,7 +255,7 @@ class CategoricalCalibration(keras.layers.Layer):
         "default_input_value": self.default_input_value,
         "split_outputs": self.split_outputs,
     }  # pyformat: disable
-    config.update(super(CategoricalCalibration, self).get_config())
+    config |= super(CategoricalCalibration, self).get_config()
     return config
 
   def assert_constraints(self, eps=1e-6):

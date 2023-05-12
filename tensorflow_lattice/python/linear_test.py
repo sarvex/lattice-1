@@ -223,8 +223,7 @@ class LinearTest(parameterized.TestCase, tf.test.TestCase):
     else:
       negated_config["monotonicities"] = -config["monotonicities"]
 
-    negated_loss = self._TrainModel(negated_config)
-    return negated_loss
+    return self._TrainModel(negated_config)
 
   @parameterized.parameters((False, 1.623906), (True, 0.456815))
   # Expected losses are computed by running this test. Correctness is verified

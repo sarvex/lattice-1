@@ -149,9 +149,13 @@ def _output_range(layer_output_range, model_config, feature_config=None):
     # min/max. Thus we follow the same scheme as the KroneckerFactoredLattice
     # lattice layer to properly initialize the kernel and scale such that
     # the output does in fact respect the requested bounds.
-    if ((isinstance(model_config, configs.CalibratedLatticeEnsembleConfig) or
-         isinstance(model_config, configs.CalibratedLatticeConfig)) and
-        model_config.parameterization == 'kronecker_factored'):
+    if (isinstance(
+        model_config,
+        (
+            configs.CalibratedLatticeEnsembleConfig,
+            configs.CalibratedLatticeConfig,
+        ),
+    )) and model_config.parameterization == 'kronecker_factored':
       output_init_min, output_init_max = kfl_lib.default_init_params(
           output_min, output_max)
     else:
@@ -181,7 +185,7 @@ def build_input_layer(feature_configs, dtype, ragged=False):
   input_layer = {}
   shape = (None,) if ragged else (1,)
   for feature_config in feature_configs:
-    layer_name = '{}_{}'.format(INPUT_LAYER_NAME, feature_config.name)
+    layer_name = f'{INPUT_LAYER_NAME}_{feature_config.name}'
     if feature_config.num_buckets:
       input_layer[feature_config.name] = tf.keras.Input(
           shape=shape, ragged=ragged, dtype=tf.int32, name=layer_name)
@@ -213,11 +217,11 @@ def build_multi_unit_calibration_layers(calibration_input_layer,
   for feature_name, units in calibration_output_units.items():
     if units == 0:
       raise ValueError(
-          'Feature {} is not used. Calibration output units is 0.'.format(
-              feature_name))
+          f'Feature {feature_name} is not used. Calibration output units is 0.'
+      )
     feature_config = model_config.feature_config_by_name(feature_name)
     calibration_input = calibration_input_layer[feature_name]
-    layer_name = '{}_{}'.format(CALIB_LAYER_NAME, feature_name)
+    layer_name = f'{CALIB_LAYER_NAME}_{feature_name}'
 
     (output_min, output_max, output_init_min,
      output_init_max) = _output_range(layer_output_range, model_config,
@@ -270,13 +274,10 @@ def build_multi_unit_calibration_layers(calibration_input_layer,
               .pwl_calibration_input_keypoints_type,
               dtype=dtype,
               name=layer_name)(calibration_input))
-    if output_single_tensor:
+    if output_single_tensor or units != 1:
       calibration_output[feature_name] = calibrated
-    elif units == 1:
-      calibration_output[feature_name] = [calibrated]
     else:
-      # calibrated will have already been split in this case.
-      calibration_output[feature_name] = calibrated
+      calibration_output[feature_name] = [calibrated]
   return calibration_output
 
 
@@ -336,11 +337,7 @@ def build_calibration_layers(calibration_input_layer, model_config,
     for (submodel_input_idx,
          (feature_name,
           calibration_output_idx)) in enumerate(submodel_input_features):
-      passthrough_name = '{}_{}_{}_{}_{}'.format(CALIB_PASSTHROUGH_NAME,
-                                                 feature_name,
-                                                 calibration_output_idx,
-                                                 submodel_idx,
-                                                 submodel_input_idx)
+      passthrough_name = f'{CALIB_PASSTHROUGH_NAME}_{feature_name}_{calibration_output_idx}_{submodel_idx}_{submodel_input_idx}'
       submodel_inputs.append(
           tf.identity(
               calibration_output[feature_name][calibration_output_idx],
@@ -380,7 +377,7 @@ def build_aggregation_layer(aggregation_input_layer, model_config,
   # Create the aggergated embeddings to pass to the middle lattice.
   lattice_inputs = []
   for i in range(model_config.middle_dimension):
-    agg_layer_name = '{}_{}'.format(AGGREGATION_LAYER_NAME, i)
+    agg_layer_name = f'{AGGREGATION_LAYER_NAME}_{i}'
     agg_output = aggregation_layer.Aggregation(
         calibrated_lattice_models[i], name=agg_layer_name)(
             aggregation_input_layer)
@@ -415,7 +412,7 @@ def build_aggregation_layer(aggregation_input_layer, model_config,
       lattice_sizes=lattice_sizes,
       output_min=output_init_min,
       output_max=output_init_max)
-  lattice_layer_name = '{}_{}'.format(LATTICE_LAYER_NAME, submodel_index)
+  lattice_layer_name = f'{LATTICE_LAYER_NAME}_{submodel_index}'
   return lattice_layer.Lattice(
       lattice_sizes=lattice_sizes,
       monotonicities=lattice_monotonicities,
@@ -455,8 +452,9 @@ def _dominance_constraints_from_feature_configs(feature_configs):
         if dominance_config.dominance_type == 'monotonic':
           monotonic_dominances.append((dominant_idx, weak_idx))
         else:
-          raise ValueError('Unrecognized dominance type: {}'.format(
-              dominance_config.dominance_type))
+          raise ValueError(
+              f'Unrecognized dominance type: {dominance_config.dominance_type}'
+          )
   return monotonic_dominances
 
 
@@ -478,7 +476,7 @@ def build_linear_layer(linear_input, feature_configs, model_config,
   Returns:
     A `tfl.layers.Linear` instance.
   """
-  layer_name = '{}_{}'.format(LINEAR_LAYER_NAME, submodel_index)
+  layer_name = f'{LINEAR_LAYER_NAME}_{submodel_index}'
 
   linear_input = tf.keras.layers.Concatenate(axis=1)(linear_input)
   num_input_dims = len(feature_configs)
@@ -538,7 +536,7 @@ def build_lattice_layer(lattice_input, feature_configs, model_config,
     ValueError: If `model_config.parameterization` is not one of
       `'all_vertices'` or `'kronecker_factored'`.
   """
-  layer_name = '{}_{}'.format(LATTICE_LAYER_NAME, submodel_index)
+  layer_name = f'{LATTICE_LAYER_NAME}_{submodel_index}'
 
   (output_min, output_max, output_init_min,
    output_init_max) = _output_range(layer_output_range, model_config)
@@ -568,8 +566,7 @@ def build_lattice_layer(lattice_input, feature_configs, model_config,
           trapezoid_trusts.append(
               (main_idx, conditional_idx, trust_config.direction))
         else:
-          raise ValueError('Unrecognized trust type: {}'.format(
-              trust_config.trust_type))
+          raise ValueError(f'Unrecognized trust type: {trust_config.trust_type}')
       elif is_inside_ensemble and trust_config.trust_type == 'trapezoid':
         logging.warning(
             'A "main" feature (%s) for a trapezoid trust constraint is not '
@@ -583,7 +580,7 @@ def build_lattice_layer(lattice_input, feature_configs, model_config,
       feature_configs)
 
   if model_config.parameterization == 'all_vertices':
-    layer_name = '{}_{}'.format(LATTICE_LAYER_NAME, submodel_index)
+    layer_name = f'{LATTICE_LAYER_NAME}_{submodel_index}'
     kernel_initializer = lattice_layer.LinearInitializer(
         lattice_sizes=lattice_sizes,
         monotonicities=lattice_monotonicities,
@@ -607,7 +604,7 @@ def build_lattice_layer(lattice_input, feature_configs, model_config,
         name=layer_name)(
             lattice_input)
   elif model_config.parameterization == 'kronecker_factored':
-    layer_name = '{}_{}'.format(KFL_LAYER_NAME, submodel_index)
+    layer_name = f'{KFL_LAYER_NAME}_{submodel_index}'
     kernel_initializer = kfll.KFLRandomMonotonicInitializer(
         monotonicities=lattice_monotonicities,
         init_min=output_init_min,
@@ -628,8 +625,8 @@ def build_lattice_layer(lattice_input, feature_configs, model_config,
         name=layer_name)(
             lattice_input)
   else:
-    raise ValueError('Unknown type of parameterization: {}'.format(
-        model_config.parameterization))
+    raise ValueError(
+        f'Unknown type of parameterization: {model_config.parameterization}')
 
 
 def build_lattice_ensemble_layer(submodels_inputs, model_config, dtype):
@@ -689,7 +686,7 @@ def build_rtl_layer(calibration_outputs, model_config, submodel_index,
     ValueError: If `model_config.parameterization` is not one of
       `'all_vertices'` or `'kronecker_factored'`.
   """
-  layer_name = '{}_{}'.format(RTL_LAYER_NAME, submodel_index)
+  layer_name = f'{RTL_LAYER_NAME}_{submodel_index}'
 
   rtl_layer_output_range = (
       LayerOutputRange.INPUT_TO_FINAL_CALIBRATION
@@ -703,7 +700,7 @@ def build_rtl_layer(calibration_outputs, model_config, submodel_index,
 
   rtl_inputs = collections.defaultdict(list)
   for feature_config in model_config.feature_configs:
-    passthrough_name = '{}_{}'.format(RTL_INPUT_NAME, feature_config.name)
+    passthrough_name = f'{RTL_INPUT_NAME}_{feature_config.name}'
     calibration_output = tf.identity(
         calibration_outputs[feature_config.name], name=passthrough_name)
     if feature_config.monotonicity in [1, -1, 'increasing', 'decreasing']:
@@ -717,8 +714,8 @@ def build_rtl_layer(calibration_outputs, model_config, submodel_index,
   elif model_config.parameterization == 'kronecker_factored':
     kernel_initializer = 'kfl_random_monotonic_initializer'
   else:
-    raise ValueError('Unknown type of parameterization: {}'.format(
-        model_config.parameterization))
+    raise ValueError(
+        f'Unknown type of parameterization: {model_config.parameterization}')
   return rtl_layer.RTL(
       num_lattices=model_config.num_lattices,
       lattice_rank=model_config.lattice_rank,
@@ -889,8 +886,8 @@ def set_categorical_monotonicities(feature_configs):
   if not isinstance(feature_configs, list) or any(
       not isinstance(fc, configs.FeatureConfig) for fc in feature_configs):
     raise ValueError(
-        'feature_configs must be a list of tfl.configs.FeatureConfig objects: '
-        '{}'.format(feature_configs))
+        f'feature_configs must be a list of tfl.configs.FeatureConfig objects: {feature_configs}'
+    )
   for feature_config in feature_configs:
     if feature_config.num_buckets and isinstance(feature_config.monotonicity,
                                                  list):
@@ -902,8 +899,8 @@ def set_categorical_monotonicities(feature_configs):
           isinstance(m, (list, tuple)) and len(m) == 2
           for m in feature_config.monotonicity):
         raise ValueError(
-            'Monotonicities should be a list of pairs (list/tuples): {}'.format(
-                feature_config.monotonicity))
+            f'Monotonicities should be a list of pairs (list/tuples): {feature_config.monotonicity}'
+        )
       indexed_monotonicities = []
       index_map = {
           category: index
@@ -915,8 +912,8 @@ def set_categorical_monotonicities(feature_configs):
         for category in [left, right]:
           if category not in index_map:
             raise ValueError(
-                'Category `{}` not found in vocabulary list for feature `{}`'
-                .format(category, feature_config.name))
+                f'Category `{category}` not found in vocabulary list for feature `{feature_config.name}`'
+            )
         indexed_monotonicities.append((index_map[left], index_map[right]))
 
       feature_config.monotonicity = indexed_monotonicities
@@ -933,8 +930,8 @@ def set_random_lattice_ensemble(model_config, feature_names=None):
   """
   if not isinstance(model_config, configs.CalibratedLatticeEnsembleConfig):
     raise ValueError(
-        'model_config must be a tfl.configs.CalibratedLatticeEnsembleConfig: {}'
-        .format(type(model_config)))
+        f'model_config must be a tfl.configs.CalibratedLatticeEnsembleConfig: {type(model_config)}'
+    )
   if model_config.lattices != 'random':
     raise ValueError('model_config.lattices must be set to \'random\'.')
   # Extract feature names
@@ -994,7 +991,7 @@ def _add_pair_to_ensemble(lattices, lattice_rank, i, j):
       return
 
   # Create a new lattice with pair (i, j).
-  lattices.append(set([i, j]))
+  lattices.append({i, j})
 
 
 def _set_all_pairs_cover_lattices(prefitting_model_config, feature_names):
@@ -1028,8 +1025,8 @@ def construct_prefitting_model_config(model_config, feature_names=None):
   """
   if not isinstance(model_config, configs.CalibratedLatticeEnsembleConfig):
     raise ValueError(
-        'model_config must be a tfl.configs.CalibratedLatticeEnsembleConfig: {}'
-        .format(type(model_config)))
+        f'model_config must be a tfl.configs.CalibratedLatticeEnsembleConfig: {type(model_config)}'
+    )
   if model_config.lattices != 'crystals':
     raise ValueError('model_config.lattices must be set to \'crystals\'.')
   # Extract feature names from model_config if not provided.
@@ -1072,44 +1069,35 @@ def _verify_prefitting_model(prefitting_model, feature_names):
   elif isinstance(prefitting_model, tf.estimator.Estimator):
     layer_names = prefitting_model.get_variable_names()
   else:
-    raise ValueError('Invalid model type for prefitting_model: {}'.format(
-        type(prefitting_model)))
+    raise ValueError(
+        f'Invalid model type for prefitting_model: {type(prefitting_model)}')
   for feature_name in feature_names:
     if isinstance(prefitting_model, tf.keras.Model):
-      input_layer_name = '{}_{}'.format(INPUT_LAYER_NAME, feature_name)
+      input_layer_name = f'{INPUT_LAYER_NAME}_{feature_name}'
       if input_layer_name not in layer_names:
         raise ValueError(
-            'prefitting_model does not match prefitting_model_config. Make '
-            'sure that prefitting_model is the proper type and constructed '
-            'from the prefitting_model_config: {}'.format(
-                type(prefitting_model)))
+            f'prefitting_model does not match prefitting_model_config. Make sure that prefitting_model is the proper type and constructed from the prefitting_model_config: {type(prefitting_model)}'
+        )
     else:
-      pwl_input_layer_name = '{}_{}/{}'.format(
-          CALIB_LAYER_NAME, feature_name,
-          pwl_calibration_layer.PWL_CALIBRATION_KERNEL_NAME)
-      cat_input_layer_name = '{}_{}/{}'.format(
-          CALIB_LAYER_NAME, feature_name,
-          categorical_calibration_layer.CATEGORICAL_CALIBRATION_KERNEL_NAME)
+      pwl_input_layer_name = f'{CALIB_LAYER_NAME}_{feature_name}/{pwl_calibration_layer.PWL_CALIBRATION_KERNEL_NAME}'
+      cat_input_layer_name = f'{CALIB_LAYER_NAME}_{feature_name}/{categorical_calibration_layer.CATEGORICAL_CALIBRATION_KERNEL_NAME}'
       if (pwl_input_layer_name not in layer_names and
           cat_input_layer_name not in layer_names):
         raise ValueError(
-            'prefitting_model does not match prefitting_model_config. Make '
-            'sure that prefitting_model is the proper type and constructed '
-            'from the prefitting_model_config: {}'.format(
-                type(prefitting_model)))
+            f'prefitting_model does not match prefitting_model_config. Make sure that prefitting_model is the proper type and constructed from the prefitting_model_config: {type(prefitting_model)}'
+        )
 
 
 def _get_lattice_weights(prefitting_model, lattice_index):
   """Gets the weights of the lattice at the specfied index."""
   if isinstance(prefitting_model, tf.keras.Model):
-    lattice_layer_name = '{}_{}'.format(LATTICE_LAYER_NAME, lattice_index)
+    lattice_layer_name = f'{LATTICE_LAYER_NAME}_{lattice_index}'
     weights = tf.keras.backend.get_value(
         prefitting_model.get_layer(lattice_layer_name).weights[0])
   else:
     # We have already checked the types by this point, so if prefitting_model
     # is not a keras Model it must be an Estimator.
-    lattice_kernel_variable_name = '{}_{}/{}'.format(
-        LATTICE_LAYER_NAME, lattice_index, lattice_layer.LATTICE_KERNEL_NAME)
+    lattice_kernel_variable_name = f'{LATTICE_LAYER_NAME}_{lattice_index}/{lattice_layer.LATTICE_KERNEL_NAME}'
     weights = prefitting_model.get_variable_value(lattice_kernel_variable_name)
   return weights
 
@@ -1193,9 +1181,9 @@ def _get_final_crystal_lattices(model_config, prefitting_model_config,
   # Add features to add list in round-robin order.
   add_list = []
   for use in range(1, max(features_uses) + 1):
-    for feature_index, feature_use in enumerate(features_uses):
-      if use <= feature_use:
-        add_list.append(feature_index)
+    add_list.extend(feature_index
+                    for feature_index, feature_use in enumerate(features_uses)
+                    if use <= feature_use)
   assert len(add_list) == total_feature_use
 
   # Setup initial lattices that will be optimized by swapping later.
@@ -1313,13 +1301,13 @@ def set_crystals_lattice_ensemble(model_config,
   # Error checking parameter types.
   if not isinstance(model_config, configs.CalibratedLatticeEnsembleConfig):
     raise ValueError(
-        'model_config must be a tfl.configs.CalibratedLatticeEnsembleConfig: {}'
-        .format(type(model_config)))
+        f'model_config must be a tfl.configs.CalibratedLatticeEnsembleConfig: {type(model_config)}'
+    )
   if not isinstance(prefitting_model_config,
                     configs.CalibratedLatticeEnsembleConfig):
-    raise ValueError('prefitting_model_config must be a '
-                     'tfl.configs.CalibratedLatticeEnsembleConfig: {}'.format(
-                         type(model_config)))
+    raise ValueError(
+        f'prefitting_model_config must be a tfl.configs.CalibratedLatticeEnsembleConfig: {type(model_config)}'
+    )
   if model_config.lattices != 'crystals':
     raise ValueError('model_config.lattices must be set to \'crystals\'.')
   # Note that we cannot check the type of the prefitting model without importing
@@ -1393,9 +1381,8 @@ def _verify_ensemble_config(model_config):
       raise ValueError('RTL Layer must have the same lattice size for all '
                        'features.')
     # Check that there are only monotonicity and bound constraints.
-    if any(
-        feature_config.unimodality != 'none' and feature_config.unimodality != 0
-        for feature_config in model_config.feature_configs):
+    if any(feature_config.unimodality not in ['none', 0]
+           for feature_config in model_config.feature_configs):
       raise ValueError(
           'RTL Layer does not currently support unimodality constraints.')
     if any(feature_config.reflects_trust_in is not None
@@ -1466,9 +1453,8 @@ def _verify_kronecker_factored_config(model_config):
     raise ValueError('KroneckerFactoredLattice layer must have the same '
                      'lattice size for all features.')
   # Check that there are only monotonicity and bound constraints.
-  if any(
-      feature_config.unimodality != 'none' and feature_config.unimodality != 0
-      for feature_config in model_config.feature_configs):
+  if any(feature_config.unimodality not in ['none', 0]
+         for feature_config in model_config.feature_configs):
     raise ValueError(
         'KroneckerFactoredLattice layer does not currently support unimodality '
         'constraints.')
@@ -1497,8 +1483,9 @@ def _verify_aggregate_function_config(model_config):
       `model_config.middle_calibration` is not True.
   """
   if model_config.middle_dimension < 1:
-    raise ValueError('Middle dimension must be at least 1: {}'.format(
-        model_config.middle_dimension))
+    raise ValueError(
+        f'Middle dimension must be at least 1: {model_config.middle_dimension}'
+    )
   if (model_config.middle_monotonicity is not None and
       not model_config.middle_calibration):
     raise ValueError(
@@ -1531,28 +1518,29 @@ def _verify_feature_config(feature_config):
     if (not np.iterable(feature_config.pwl_calibration_input_keypoints) or
         any(not isinstance(x, (int, float))
             for x in feature_config.pwl_calibration_input_keypoints)):
-      raise ValueError('Input keypoints are invalid for feature {}: {}'.format(
-          feature_config.name, feature_config.pwl_calibration_input_keypoints))
+      raise ValueError(
+          f'Input keypoints are invalid for feature {feature_config.name}: {feature_config.pwl_calibration_input_keypoints}'
+      )
   elif feature_config.monotonicity and feature_config.monotonicity != 'none':
     # Validate Categorical Calibration configuration.
     if not np.iterable(feature_config.monotonicity):
-      raise ValueError('Monotonicity is not a list for feature {}: {}'.format(
-          feature_config.name, feature_config.monotonicity))
+      raise ValueError(
+          f'Monotonicity is not a list for feature {feature_config.name}: {feature_config.monotonicity}'
+      )
     for i, t in enumerate(feature_config.monotonicity):
       if not np.iterable(t):
         raise ValueError(
-            'Element {} is not a list/tuple for feature {} monotonicty: {}'
-            .format(i, feature_config.name, t))
+            f'Element {i} is not a list/tuple for feature {feature_config.name} monotonicty: {t}'
+        )
       for j, val in enumerate(t):
         if not isinstance(val, int):
           raise ValueError(
-              'Element {} for list/tuple {} for feature {} monotonicity is '
-              'not an index: {}'.format(j, i, feature_config.name, val))
+              f'Element {j} for list/tuple {i} for feature {feature_config.name} monotonicity is not an index: {val}'
+          )
         if val < 0 or val >= feature_config.num_buckets:
           raise ValueError(
-              'Element {} for list/tuple {} for feature {} monotonicity is '
-              'an invalid index not in range [0, num_buckets - 1]: {}'.format(
-                  j, i, feature_config.name, val))
+              f'Element {j} for list/tuple {i} for feature {feature_config.name} monotonicity is an invalid index not in range [0, num_buckets - 1]: {val}'
+          )
 
 
 def verify_config(model_config):
@@ -1572,9 +1560,13 @@ def verify_config(model_config):
     raise ValueError('Feature configs must be fully specified.')
   if isinstance(model_config, configs.CalibratedLatticeEnsembleConfig):
     _verify_ensemble_config(model_config)
-  if ((isinstance(model_config, configs.CalibratedLatticeEnsembleConfig) or
-       isinstance(model_config, configs.CalibratedLatticeConfig)) and
-      model_config.parameterization == 'kronecker_factored'):
+  if (isinstance(
+      model_config,
+      (
+          configs.CalibratedLatticeEnsembleConfig,
+          configs.CalibratedLatticeConfig,
+      ),
+  )) and model_config.parameterization == 'kronecker_factored':
     _verify_kronecker_factored_config(model_config)
   if isinstance(model_config, configs.AggregateFunctionConfig):
     _verify_aggregate_function_config(model_config)
@@ -1583,5 +1575,6 @@ def verify_config(model_config):
   if (not np.iterable(model_config.output_initialization) or
       any(not isinstance(x, (int, float))
           for x in model_config.output_initialization)):
-    raise ValueError('Output initilization is invalid: {}'.format(
-        model_config.output_initialization))
+    raise ValueError(
+        f'Output initilization is invalid: {model_config.output_initialization}'
+    )

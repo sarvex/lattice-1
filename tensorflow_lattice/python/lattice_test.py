@@ -71,8 +71,8 @@ class LatticeTest(parameterized.TestCase, tf.test.TestCase):
   def _SameValueForAllDims(self, num_points, lattice_sizes):
     """Generates random point with same value for every dimension."""
     if lattice_sizes.count(lattice_sizes[0]) != len(lattice_sizes):
-      raise ValueError("All dimensions must be of same size. "
-                       "They are: {}".format(lattice_sizes))
+      raise ValueError(
+          f"All dimensions must be of same size. They are: {lattice_sizes}")
     np.random.seed(41)
     x = []
     for _ in range(num_points):
@@ -1162,31 +1162,28 @@ class LatticeTest(parameterized.TestCase, tf.test.TestCase):
 
   def _MergeDicts(self, x, y):
     z = dict(x)
-    z.update(y)
+    z |= y
     return z
 
   def testLinearMonotonicInitializer(self):
     if self.disable_all:
       return
-    # Test initializer by training linear function using 0 iteration and verify
-    # that loss is 0.
-    config = {
-        "num_training_records": 96,
-        "num_training_epoch": 0,
-        "optimizer": tf.keras.optimizers.Adagrad,
-        "learning_rate": 1.0,
-        "x_generator": self._TwoDMeshGrid,
-    }  # pyformat: disable
-
     init_config = {
         "lattice_sizes": [3, 4],
         "monotonicities": [0, 0],
         "output_min": -1.0,
         "output_max": 2.0,
     }
-    config["kernel_initializer"] = "LinearInitializer"
-    config["y_function"] = test_utils.get_linear_lattice_interpolation_fn(
-        **init_config)
+    config = {
+        "num_training_records": 96,
+        "num_training_epoch": 0,
+        "optimizer": tf.keras.optimizers.Adagrad,
+        "learning_rate": 1.0,
+        "x_generator": self._TwoDMeshGrid,
+        "kernel_initializer": "LinearInitializer",
+        "y_function":
+        test_utils.get_linear_lattice_interpolation_fn(**init_config),
+    }
     total_config = self._MergeDicts(config, init_config)
     loss = self._TrainModel(total_config)
     self.assertAlmostEqual(loss, 0.0, delta=self.small_eps)
@@ -1544,9 +1541,8 @@ class LatticeTest(parameterized.TestCase, tf.test.TestCase):
       d = min(abs(x[0] - 3.0), abs(x[0] - 7.0))
       result = d * d / 4.0 - 2.0
       # Mirroring to test opposite unimodality direction on same data.
-      if unimodalities:
-        if unimodalities[0] == -1 or unimodalities[0] == "peak":
-          result *= -1.0
+      if unimodalities and unimodalities[0] in [-1, "peak"]:
+        result *= -1.0
       return result
 
     config = {

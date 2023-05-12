@@ -706,12 +706,9 @@ class CannedEstimatorsTest(parameterized.TestCase, tf.test.TestCase):
                                                     serving_input_fn)
     logging.info('Model exported to %s', saved_model_path)
     model = estimators.get_model_graph(saved_model_path)
-    lattices = []
-    for node in model.nodes:
-      if isinstance(node, model_info.LatticeNode):
-        lattices.append(
-            [input_node.input_node.name for input_node in node.input_nodes])
-
+    lattices = [[input_node.input_node.name for input_node in node.input_nodes]
+                for node in model.nodes
+                if isinstance(node, model_info.LatticeNode)]
     self.assertLen(lattices, len(expected_lattices))
     for lattice, expected_lattice in zip(lattices, expected_lattices):
       self.assertCountEqual(lattice, expected_lattice)
